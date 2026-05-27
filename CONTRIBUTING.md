@@ -286,6 +286,34 @@ The `.github/CODEOWNERS` file maps directories to their maintainers:
 
 3. For urgent reviews or specific questions, you can also comment on the PR with a mention.
 
+## Issue Labels
+
+Issue and pull request labels are defined as code in [`.github/labels.yml`](.github/labels.yml) so they stay consistent across the repository. That file is the single source of truth: a label that exists on GitHub but is not listed there will be removed on the next sync.
+
+### Color Scheme
+
+Labels are grouped by category, and every label in a category shares a hue:
+
+| Category           | Color           | Meaning                                   |
+| ------------------ | --------------- | ----------------------------------------- |
+| Platform           | blue (`1d76db`) | Where the work runs (`mobile`, `web`, `mini-apps`) |
+| Engineering domain | purple (`5319e7`) | Which codebase/layer (`contracts`, `smart-contract`, `sdk`, `indexer`) |
+| Quality & process  | red (`d93f0b`)  | Cross-cutting quality (`testing`, `documentation`, `security`) |
+| Product feature     | green (`0e8a16`) | User-facing areas (`wallet`, `feed`, `profile`, `pools`, `explore`) |
+| Experience         | lilac (`d4c5f9`) | Look, feel and inclusivity (`UX`, `accessibility`) |
+| Triage & meta      | assorted        | Workflow labels (`developer experience`, `good first issue`, `help wanted`, `enhancement`, `bug`) |
+
+### Syncing Labels
+
+Maintainers can apply the definitions to GitHub with:
+
+```bash
+export GITHUB_TOKEN=<a token with repo scope>
+make labels
+```
+
+`make labels` runs [`github-label-sync`](https://github.com/Financial-Times/github-label-sync) against the `origin` remote using the `GITHUB_TOKEN` environment variable. To add, rename, recolor, or remove a label, edit `.github/labels.yml` and re-run the target.
+
 ## Security
 
 If you discover a security vulnerability, please review our [Security Policy](SECURITY.md) for responsible disclosure guidelines. Do not open public issues for security concerns.
