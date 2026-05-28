@@ -286,33 +286,29 @@ The `.github/CODEOWNERS` file maps directories to their maintainers:
 
 3. For urgent reviews or specific questions, you can also comment on the PR with a mention.
 
-## Issue Labels
+## Dependency Updates
 
-Issue and pull request labels are defined as code in [`.github/labels.yml`](.github/labels.yml) so they stay consistent across the repository. That file is the single source of truth: a label that exists on GitHub but is not listed there will be removed on the next sync.
+Dependencies are kept current automatically by [Dependabot](https://docs.github.com/code-security/dependabot), configured in [`.github/dependabot.yml`](.github/dependabot.yml).
 
-### Color Scheme
+### What is covered
 
-Labels are grouped by category, and every label in a category shares a hue:
+| Ecosystem | Locations |
+| --- | --- |
+| `npm` | repo root, `packages/web`, `packages/sdk`, `apps/web`, `apps/mobile`, `services/indexer` |
+| `cargo` | `packages/contracts` |
+| `github-actions` | `.github/workflows/` |
 
-| Category           | Color           | Meaning                                   |
-| ------------------ | --------------- | ----------------------------------------- |
-| Platform           | blue (`1d76db`) | Where the work runs (`mobile`, `web`, `mini-apps`) |
-| Engineering domain | purple (`5319e7`) | Which codebase/layer (`contracts`, `smart-contract`, `sdk`, `indexer`) |
-| Quality & process  | red (`d93f0b`)  | Cross-cutting quality (`testing`, `documentation`, `security`) |
-| Product feature     | green (`0e8a16`) | User-facing areas (`wallet`, `feed`, `profile`, `pools`, `explore`) |
-| Experience         | lilac (`d4c5f9`) | Look, feel and inclusivity (`UX`, `accessibility`) |
-| Triage & meta      | assorted        | Workflow labels (`developer experience`, `good first issue`, `help wanted`, `enhancement`, `bug`) |
+> `apps/mobile` and `services/indexer` are listed ahead of their creation, so they start receiving updates as soon as a manifest is added.
 
-### Syncing Labels
+### How it works
 
-Maintainers can apply the definitions to GitHub with:
+- **Weekly cadence:** Dependabot checks each ecosystem once a week and opens PRs for outdated dependencies.
+- **Grouped PRs:** updates are grouped per ecosystem (and split into production/development for npm) so reviewers see one PR instead of many, reducing noise.
+- **Auto-merge for patches:** the [`dependabot-auto-merge`](.github/workflows/dependabot-auto-merge.yml) workflow enables auto-merge for `semver-patch` updates. GitHub only merges them **after required CI checks pass** — a failing build keeps the PR open for manual review. Minor and major updates always require a manual review and merge.
 
-```bash
-export GITHUB_TOKEN=<a token with repo scope>
-make labels
-```
+### Reviewing Dependabot PRs
 
-`make labels` runs [`github-label-sync`](https://github.com/Financial-Times/github-label-sync) against the `origin` remote using the `GITHUB_TOKEN` environment variable. To add, rename, recolor, or remove a label, edit `.github/labels.yml` and re-run the target.
+Treat Dependabot PRs like any other change: confirm CI is green, skim the changelog for the bumped dependency, and merge minor/major updates manually once you are confident they are safe.
 
 ## Security
 
