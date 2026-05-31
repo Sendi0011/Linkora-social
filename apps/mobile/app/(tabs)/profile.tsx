@@ -24,7 +24,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </>
       ) : (
-        <TouchableOpacity style={styles.button} onPress={connect}>
+        <TouchableOpacity style={styles.button} onPress={() => connect()}>
           <Text style={styles.buttonText}>Connect Wallet</Text>
         </TouchableOpacity>
       )}
