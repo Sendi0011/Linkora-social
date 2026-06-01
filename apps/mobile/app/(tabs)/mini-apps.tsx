@@ -13,10 +13,12 @@ export default function MiniAppsScreen() {
   const handlePress = useCallback(
     (app: MiniApp) => {
       router.push(
-        `/mini-app/${app.id}?name=${encodeURIComponent(app.name)}&entry=${encodeURIComponent(app.entry)}` as Parameters<typeof router.push>[0],
+        `/mini-app/${app.id}?name=${encodeURIComponent(app.name)}&entry=${encodeURIComponent(app.entry)}` as Parameters<
+          typeof router.push
+        >[0]
       );
     },
-    [router],
+    [router]
   );
 
   const handleLongPress = useCallback(
@@ -53,9 +55,7 @@ export default function MiniAppsScreen() {
           title="No Mini Apps"
           description="Discover and install mini apps to enhance your Linkora experience."
           actionText="Browse Discovery"
-          onActionPress={() =>
-            router.push("/(tabs)/explore" as Parameters<typeof router.push>[0])
-          }
+          onActionPress={() => router.push("/(tabs)/explore" as Parameters<typeof router.push>[0])}
         />
       }
     />
