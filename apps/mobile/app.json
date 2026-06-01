@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "Linkora",
+    "slug": "linkora-mobile",
+    "scheme": "linkora",
+    "userInterfaceStyle": "dark"
+  }
+}

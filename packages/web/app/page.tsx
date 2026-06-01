@@ -298,7 +298,7 @@ export default function Page() {
             <StateCard
               label="Network / RPC"
               title="Cannot reach RPC endpoint"
-              copy="Linkora cannot sync with Solana right now. Please retry or switch endpoint."
+              copy="Linkora cannot sync with Stellar right now. Please retry or switch endpoint."
               action="Retry connection"
             />
             <StateCard

@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 interface WalletState {
   publicKey: string | null;
@@ -50,26 +43,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const checkFreighter = useCallback(async (): Promise<boolean> => {
-    try {
-      if (window.freighterApi) {
-        const connected = await window.freighterApi.isConnected();
-        return connected;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
-
   const connect = useCallback(async () => {
     setState((prev) => ({ ...prev, isConnecting: true, error: null }));
 
     try {
       if (!window.freighterApi) {
-        throw new Error(
-          "Freighter wallet not detected. Please install Freighter wallet."
-        );
+        throw new Error("Freighter wallet not detected. Please install Freighter wallet.");
       }
 
       const { publicKey } = await window.freighterApi.getPublicKey();
@@ -83,8 +62,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         error: null,
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to connect wallet";
+      const message = err instanceof Error ? err.message : "Failed to connect wallet";
       setState((prev) => ({
         ...prev,
         isConnecting: false,

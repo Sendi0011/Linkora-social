@@ -2,6 +2,15 @@ name: Integration Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run Playwright E2E tests after integration tests'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
   schedule:
     # Runs nightly at 02:00 UTC.
     - cron: "0 2 * * *"
@@ -19,7 +28,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32v1-none
+          targets: wasm32-unknown-unknown
 
       - name: Cache Rust build artefacts
         uses: Swatinem/rust-cache@v2
@@ -34,13 +43,11 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install JS dependencies
@@ -48,3 +55,22 @@ jobs:
 
       - name: Run integration tests
         run: pnpm test:integration
+
+      - name: Install Playwright browsers (optional E2E)
+        if: github.event.inputs.run_e2e == 'true' || github.event_name == 'schedule'
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run Playwright E2E tests (optional)
+        if: github.event.inputs.run_e2e == 'true' || github.event_name == 'schedule'
+        working-directory: packages/web
+        env:
+          CI: true
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report (optional E2E)
+        uses: actions/upload-artifact@v4
+        if: (github.event.inputs.run_e2e == 'true' || github.event_name == 'schedule') && always()
+        with:
+          name: playwright-report
+          path: packages/web/playwright-report/
+          retention-days: 30

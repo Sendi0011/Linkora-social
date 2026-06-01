@@ -1,25 +1,44 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useWallet } from "../../components/WalletProvider";
+import { TipModal } from "../../components/TipModal";
 
 interface Post {
   id: number;
   author: string;
+  username?: string;
   content: string;
   tip_total: number;
   timestamp: number;
   like_count: number;
-  username?: string;
+}
+
+async function getPost(id: number): Promise<Post | null> {
+  // Mock for now: replace with contract call get_post(id).
+  await new Promise((resolve) => setTimeout(resolve, 450));
+
+  if (!id || id < 1) {
+    return null;
+  }
+
+  return {
+    id,
+    author: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF3",
+    username: "creator_alice",
+    content:
+      "Just deployed my first Soroban smart contract! The Stellar network's speed and low fees make it genuinely viable for creator economy applications. If you're building on-chain social, look no further. 🚀\n\nHere's what I learned from the experience…",
+    tip_total: 245_000_000,
+    timestamp: Math.floor(Date.now() / 1000) - 10800,
+    like_count: 47,
+  };
 }
 
 export default function PostPage() {
   const params = useParams();
-  const router = useRouter();
-  const postId = Number(params.id);
-
+  const postId = Number(params?.id);
   const { publicKey, isConnected } = useWallet();
 
   const [post, setPost] = useState<Post | null>(null);
@@ -27,54 +46,57 @@ export default function PostPage() {
   const [notFound, setNotFound] = useState(false);
   const [hasLiked, setHasLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
-
   const [tipToken, setTipToken] = useState("");
   const [tipAmount, setTipAmount] = useState("");
   const [isTipping, setIsTipping] = useState(false);
   const [tipError, setTipError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  const [showTipModal, setShowTipModal] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     setLoading(true);
     setNotFound(false);
+    setDeleted(false);
 
-    setTimeout(() => {
-      if (postId <= 0) {
+    getPost(postId)
+      .then((result) => {
+        if (!mounted) return;
+        if (!result) {
+          setNotFound(true);
+          return;
+        }
+        setPost(result);
+      })
+      .catch(() => {
+        if (!mounted) return;
         setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      setPost({
-        id: postId,
-        author: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-        content: "This is a sample post content loaded from the blockchain. It demonstrates how the post detail page displays all the information including the author, timestamp, likes, and tips.",
-        tip_total: 50000000,
-        timestamp: Date.now() / 1000 - 3600,
-        like_count: 12,
-        username: "sample_user",
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
       });
-      setLoading(false);
-    }, 500);
+
+    return () => {
+      mounted = false;
+    };
   }, [postId]);
 
   const handleLike = useCallback(async () => {
-    if (!isConnected || isLiking) return;
+    if (!isConnected || isLiking || !post) return;
     setIsLiking(true);
 
     try {
-      console.log("Liking post:", postId, "with publicKey:", publicKey);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      await new Promise((resolve) => setTimeout(resolve, 650));
       setHasLiked((prev) => !prev);
       setPost((prev) =>
-        prev ? { ...prev, like_count: prev.like_count + (hasLiked ? -1 : 1) } : prev,
+        prev
+          ? { ...prev, like_count: prev.like_count + (hasLiked ? -1 : 1) }
+          : prev
       );
-    } catch (err) {
-      console.error("Failed to like post:", err);
     } finally {
       setIsLiking(false);
     }
-  }, [isConnected, isLiking, postId, publicKey, hasLiked]);
+  }, [isConnected, isLiking, hasLiked, post]);
 
   const handleTip = useCallback(
     async (e: React.FormEvent) => {
@@ -91,18 +113,12 @@ export default function PostPage() {
       setTipError(null);
 
       try {
-        console.log("Tipping post:", postId, "with amount:", amount, "token:", tipToken);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         setPost((prev) =>
           prev
-            ? {
-                ...prev,
-                tip_total: prev.tip_total + amount * 10_000_000,
-              }
-            : prev,
+            ? { ...prev, tip_total: prev.tip_total + amount * 10_000_000 }
+            : prev
         );
-
         setTipToken("");
         setTipAmount("");
       } catch (err) {
@@ -111,36 +127,43 @@ export default function PostPage() {
         setIsTipping(false);
       }
     },
-    [isConnected, tipToken, tipAmount, postId],
+    [isConnected, tipAmount, tipToken]
   );
 
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
+  const handleDelete = useCallback(() => {
+    if (!window.confirm("Delete this post? This action cannot be undone.")) {
+      return;
+    }
+    setDeleted(true);
+  }, []);
+
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const formatTimestamp = (ts: number) => {
     const date = new Date(ts * 1000);
     return date.toLocaleString();
   };
 
-  const formatTipTotal = (amount: number) => {
-    return (amount / 10_000_000).toFixed(2);
-  };
+  const formatTipTotal = (amount: number) => (amount / 10_000_000).toFixed(2);
 
   if (loading) {
     return (
       <main style={styles.main}>
-        <div style={styles.loading}>Loading...</div>
+        <div style={styles.loading}>Loading post...</div>
       </main>
     );
   }
 
-  if (notFound || !post) {
+  if (notFound || deleted || !post) {
     return (
       <main style={styles.main}>
         <div style={styles.notFound}>
           <h1>Post not found</h1>
-          <p>The post you are looking for doesn&apos;t exist or has been removed.</p>
+          <p>
+            {deleted
+              ? "This post was deleted successfully."
+              : "The post you are looking for is missing or has been removed."}
+          </p>
           <Link href="/feed" style={styles.backLink}>
             Back to Feed
           </Link>
@@ -159,10 +182,7 @@ export default function PostPage() {
         <div style={styles.header}>
           <div style={styles.avatar}></div>
           <div style={styles.authorInfo}>
-            <Link
-              href={`/profile/${post.author}`}
-              style={styles.username}
-            >
+            <Link href={`/profile/${post.author}`} style={styles.username}>
               {post.username || formatAddress(post.author)}
             </Link>
             <div style={styles.timestamp}>{formatTimestamp(post.timestamp)}</div>
@@ -192,10 +212,24 @@ export default function PostPage() {
                 ...(hasLiked ? styles.likedButton : {}),
               }}
             >
-              {hasLiked ? "❤️ Liked" : "🤍 Like"} ({post.like_count})
+              {hasLiked ? "❤️ Liked" : "🤍 Like"}
             </button>
           ) : (
-            <p style={styles.readOnlyText}> Connect wallet to like</p>
+            <p style={styles.readOnlyText}>Connect wallet to like</p>
+          )}
+
+          <button
+            onClick={() => setShowTipModal(true)}
+            style={styles.actionButton}
+            disabled={!isConnected}
+          >
+            💎 Tip
+          </button>
+
+          {isConnected && publicKey === post.author && (
+            <button onClick={handleDelete} style={styles.deleteButton}>
+              🗑 Delete
+            </button>
           )}
         </div>
 
@@ -207,7 +241,7 @@ export default function PostPage() {
                 type="text"
                 value={tipToken}
                 onChange={(e) => setTipToken(e.target.value)}
-                placeholder="Token address (e.g., G..."
+                placeholder="Token address (e.g., G...)"
                 style={styles.input}
                 disabled={isTipping}
               />
@@ -228,9 +262,7 @@ export default function PostPage() {
               disabled={isTipping || !tipToken || !tipAmount}
               style={{
                 ...styles.tipButton,
-                ...(isTipping || !tipToken || !tipAmount
-                  ? styles.tipButtonDisabled
-                  : {}),
+                ...(isTipping || !tipToken || !tipAmount ? styles.tipButtonDisabled : {}),
               }}
             >
               {isTipping ? "Sending..." : "Send Tip"}
@@ -238,6 +270,14 @@ export default function PostPage() {
           </form>
         )}
       </article>
+
+      {showTipModal && (
+        <TipModal
+          postId={post.id}
+          authorName={post.username || formatAddress(post.author)}
+          onClose={() => setShowTipModal(false)}
+        />
+      )}
     </main>
   );
 }
@@ -329,9 +369,19 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "8px",
     fontWeight: 500,
     transition: "all 0.2s",
+    border: "1px solid var(--color-border)",
   },
   likedButton: {
     background: "#fee2e2",
+  },
+  deleteButton: {
+    padding: "var(--spacing-sm) var(--spacing-lg)",
+    background: "#fecaca",
+    borderRadius: "8px",
+    color: "#991b1b",
+    fontWeight: 500,
+    border: "1px solid #fca5a5",
+    cursor: "pointer",
   },
   readOnlyText: {
     color: "var(--color-text-secondary)",

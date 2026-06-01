@@ -15,9 +15,7 @@ export function SearchBar({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (query.trim()) {
-        onSearch(query.trim());
-      }
+      onSearch(query.trim());
     }, 300);
 
     return () => clearTimeout(timer);

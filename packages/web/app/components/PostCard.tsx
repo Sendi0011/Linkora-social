@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLike } from "../hooks/useLike";
 
 export interface Post {
   id: number;
@@ -14,8 +14,10 @@ export interface Post {
 
 interface PostCardProps {
   post: Post;
+  /** Optional notification fired after a like is committed (e.g. to refresh). */
   onLike?: (postId: number) => void;
   onTip?: (postId: number) => void;
+  /** Initial liked state, derived from the contract's `has_liked`. */
   isLiked?: boolean;
 }
 
@@ -25,16 +27,16 @@ export function PostCard({
   onTip,
   isLiked = false,
 }: PostCardProps) {
-  const [liking, setLiking] = useState(false);
+  const { liked, likeCount, pending, error, like } = useLike({
+    postId: post.id,
+    initialHasLiked: isLiked,
+    initialLikeCount: post.like_count,
+  });
 
   const handleLike = async () => {
-    if (liking || !onLike) return;
-    setLiking(true);
-    try {
-      await onLike(post.id);
-    } finally {
-      setLiking(false);
-    }
+    if (liked || pending) return;
+    const committed = await like();
+    if (committed) onLike?.(post.id);
   };
 
   const formatAddress = (addr: string) => {
@@ -73,15 +75,17 @@ export function PostCard({
       <div style={styles.actions}>
         <button
           onClick={handleLike}
-          disabled={liking}
+          disabled={pending || liked}
           style={{
             ...styles.actionButton,
-            ...(isLiked ? styles.likedButton : {}),
+            ...(liked ? styles.likedButton : {}),
           }}
-          aria-label={isLiked ? "Unlike post" : "Like post"}
+          aria-label={liked ? "Liked" : "Like post"}
+          aria-pressed={liked}
+          title={error ?? undefined}
         >
-          <span style={styles.icon}>{isLiked ? "❤️" : "🤍"}</span>
-          <span>{post.like_count}</span>
+          <span style={styles.icon}>{liked ? "❤️" : "🤍"}</span>
+          <span>{likeCount}</span>
         </button>
 
         <div style={styles.tipBadge}>

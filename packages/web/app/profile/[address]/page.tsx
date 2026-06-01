@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { PostCard, Post } from "../../components/PostCard";
+import { TipModal } from "../../components/TipModal";
 
 // In a real app this comes from a wallet context / auth hook.
 const MOCK_CURRENT_USER = "";
@@ -98,6 +99,68 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function ProfileHeader({
+  address,
+  username,
+  creatorToken,
+  followerCount,
+  followingCount,
+  isOwnProfile,
+  followState,
+  onFollow,
+  onUnfollow,
+}: {
+  address: string;
+  username: string;
+  creatorToken: string;
+  followerCount: number;
+  followingCount: number;
+  isOwnProfile: boolean;
+  followState: FollowState;
+  onFollow: () => void;
+  onUnfollow: () => void;
+}) {
+  return (
+    <section style={styles.header}>
+      <div style={styles.avatarLg} aria-hidden="true" />
+      <div style={styles.meta}>
+        <div style={styles.usernameRow}>
+          <h1 style={styles.username}>@{username}</h1>
+          {isOwnProfile && (
+            <a href={`/profile/${address}/edit`} style={styles.editLink}>
+              Edit profile
+            </a>
+          )}
+        </div>
+        <div style={styles.addressRow}>
+          <code style={styles.address}>{formatAddress(address)}</code>
+          <CopyButton text={address} />
+        </div>
+        <CreatorTokenBadge token={creatorToken} />
+        <div style={styles.statsRow}>
+          <span style={styles.stat}>
+            <strong>{followerCount}</strong>
+            <span style={styles.statLabel}> Followers</span>
+          </span>
+          <span style={styles.stat}>
+            <strong>{followingCount}</strong>
+            <span style={styles.statLabel}> Following</span>
+          </span>
+        </div>
+      </div>
+      {!isOwnProfile && (
+        <div style={styles.actions}>
+          <FollowButton
+            state={followState}
+            onFollow={onFollow}
+            onUnfollow={onUnfollow}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function ProfilePage() {
   const params = useParams();
   const address = params?.address as string;
@@ -108,6 +171,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
+  const [tippingPost, setTippingPost] = useState<{ id: number; author: string } | null>(null);
   const [followState, setFollowState] = useState<FollowState>("not_following");
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -205,49 +269,17 @@ export default function ProfilePage() {
 
   return (
     <main style={styles.page}>
-      {/* ── Profile header ─────────────────────────────────────────────── */}
-      <section style={styles.header}>
-        <div style={styles.avatarLg} aria-hidden="true" />
-
-        <div style={styles.meta}>
-          <div style={styles.usernameRow}>
-            <h1 style={styles.username}>@{profile.username}</h1>
-            {isOwnProfile && (
-              <a href={`/profile/${address}/edit`} style={styles.editLink}>
-                Edit profile
-              </a>
-            )}
-          </div>
-
-          <div style={styles.addressRow}>
-            <code style={styles.address}>{formatAddress(profile.address)}</code>
-            <CopyButton text={profile.address} />
-          </div>
-
-          <CreatorTokenBadge token={profile.creator_token} />
-
-          <div style={styles.statsRow}>
-            <span style={styles.stat}>
-              <strong>{profile.follower_count}</strong>
-              <span style={styles.statLabel}> Followers</span>
-            </span>
-            <span style={styles.stat}>
-              <strong>{profile.following_count}</strong>
-              <span style={styles.statLabel}> Following</span>
-            </span>
-          </div>
-        </div>
-
-        {!isOwnProfile && (
-          <div style={styles.actions}>
-            <FollowButton
-              state={followState}
-              onFollow={handleFollow}
-              onUnfollow={handleUnfollow}
-            />
-          </div>
-        )}
-      </section>
+      <ProfileHeader
+        address={profile.address}
+        username={profile.username}
+        creatorToken={profile.creator_token}
+        followerCount={profile.follower_count}
+        followingCount={profile.following_count}
+        isOwnProfile={isOwnProfile}
+        followState={followState}
+        onFollow={handleFollow}
+        onUnfollow={handleUnfollow}
+      />
 
       {/* ── Post list ──────────────────────────────────────────────────── */}
       <section>
@@ -267,11 +299,24 @@ export default function ProfilePage() {
               key={post.id}
               post={post}
               onLike={handleLike}
+              onTip={(postId) => {
+                const p = posts.find((item) => item.id === postId);
+                if (p) {
+                  setTippingPost({ id: p.id, author: p.username || p.author });
+                }
+              }}
               isLiked={likedPosts.has(post.id)}
             />
           ))
         )}
       </section>
+      {tippingPost && (
+        <TipModal
+          postId={tippingPost.id}
+          authorName={tippingPost.author}
+          onClose={() => setTippingPost(null)}
+        />
+      )}
     </main>
   );
 }

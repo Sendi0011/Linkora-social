@@ -1,37 +1,71 @@
 # Security Policy
 
-## Scope
+## Supported Versions
 
-This security policy applies to smart contract code in:
+| Version | Supported |
+|---------|-----------|
+| 0.1.x (current) | ✅ Yes |
 
-- `packages/contracts/contracts/linkora-contracts`
+Security fixes are applied to the latest version only. This project is in prototype stage and has not been audited for production use.
 
-The repository is currently a prototype. Frontend and backend services are not included here, and no production deployment guarantees are implied.
+## Reporting a Vulnerability
 
-## Supported Status
+**Do not open a public GitHub issue for security vulnerabilities.**
 
-The current contract implementation should be treated as pre-production software. Security reports are welcome for all active code in the repository, but maintainers may prioritize fixes based on severity and roadmap impact.
+Use **[GitHub Security Advisories](https://github.com/Epta-Node/Linkora-social/security/advisories/new)** to report privately. This keeps the disclosure confidential until a fix is ready.
 
-## Responsible Disclosure
+Include in your report:
+- Affected function(s) or file(s)
+- Steps to reproduce or proof of concept
+- Impact assessment (e.g. fund loss, access control bypass, DoS)
+- Suggested fix (optional)
 
-If you discover a vulnerability, please do **not** open a public issue first.
+## Response Timeline
 
-Use one of these private channels:
+| Milestone | Target |
+|-----------|--------|
+| Acknowledgement | Within 48 hours |
+| Triage & severity classification | Within 7 days |
+| Fix for **Critical** vulnerabilities | Within 14 days |
+| Fix for **High** vulnerabilities | Within 30 days |
+| Fix for **Medium / Low** vulnerabilities | Next scheduled release |
 
-- Open a private GitHub security advisory for this repository.
-- Email: `security@linkora.social`
+We will keep you informed throughout the process and coordinate disclosure timing with you before publishing a security advisory.
 
-Please include:
+## Severity Definitions
 
-- A clear description of the issue and affected function(s)
-- Reproduction steps or proof of concept
-- Impact assessment (fund loss, denial of service, access control bypass, etc.)
-- Suggested remediation (optional)
+- **Critical** — Direct loss of funds, pool drainage, unauthorized token transfers
+- **High** — Access control bypass, contract upgrade abuse
+- **Medium** — Denial of service, logic errors without direct fund loss
+- **Low** — Information disclosure, minor logic issues
 
-## Response Expectations
+## Out-of-Scope Items
 
-Maintainers will acknowledge valid reports as quickly as possible and coordinate remediation and disclosure timelines. Critical issues affecting token transfer safety and pool balances are prioritized.
+The following are **not** eligible for security reports:
 
-## Prototype Limitations
+- Frontend UI components and mock data (not yet in this repository)
+- Backend services and APIs (not yet in this repository)
+- Issues requiring physical access to a user's device
+- Social engineering attacks
+- Third-party dependencies unless directly exploitable in the contract context
+- Network-level attacks on Stellar infrastructure
+- Vulnerabilities in already-deprecated or unsupported versions
 
-Known limitations are described in the root `README.md` under current limitations. This project has not completed a formal external audit and should not be used for high-value production funds without additional hardening.
+## Bug Bounty
+
+There is no formal paid bug bounty program at this time. Researchers who responsibly disclose valid vulnerabilities will be:
+
+- Credited in the published security advisory (with permission)
+- Acknowledged in release notes and community channels
+
+This may be revisited as the project matures toward production.
+
+## Disclosure Process
+
+1. Reporter submits via GitHub Security Advisories (private)
+2. Team acknowledges within 48 hours
+3. Team triages severity within 7 days
+4. Fix developed and reviewed based on severity timeline above
+5. Reporter notified before public disclosure
+6. Security advisory published after fix is deployed
+7. Reporter credited (with permission)
