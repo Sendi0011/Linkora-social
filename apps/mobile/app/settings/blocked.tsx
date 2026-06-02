@@ -1,19 +1,9 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useMemo } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
+import { useBlock } from "../../hooks/useBlock";
 import { useTheme } from "../../theme/useTheme";
-
-const INITIAL_BLOCKED = [
-  {
-    address: "GCFM4HKN3K2HMQY3X7T62JAT4B73W5C5V2F3KJDJQJY5M7WQ4H7W3ABC",
-    reason: "Spam replies",
-  },
-  {
-    address: "GBQ4BJEK4ABWQ5NEM7N5W3M7X4T2R6N3ZJYQ3FQW6N5K4JH6D2J7CDEF",
-    reason: "Harassment",
-  },
-];
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 8)}…${address.slice(-6)}`;
@@ -23,7 +13,31 @@ export default function BlockedUsersScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [blocked, setBlocked] = useState(INITIAL_BLOCKED);
+  const { blocked, loading, error, blocking, unblockUser, refresh } = useBlock();
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={theme.colors.brand.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={refresh}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading blocked users"
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -44,10 +58,18 @@ export default function BlockedUsersScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Unblock ${user.address}`}
-                onPress={() => setBlocked((current) => current.filter((item) => item.address !== user.address))}
-                style={styles.unblockButton}
+                disabled={blocking === user.address}
+                onPress={() => unblockUser(user.address)}
+                style={[
+                  styles.unblockButton,
+                  blocking === user.address && styles.unblockButtonDisabled,
+                ]}
               >
-                <Text style={styles.unblockText}>Unblock</Text>
+                {blocking === user.address ? (
+                  <ActivityIndicator size="small" color={theme.colors.semantic.error} />
+                ) : (
+                  <Text style={styles.unblockText}>Unblock</Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -76,6 +98,12 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"]) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.surface.background,
+    },
+    centered: {
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      gap: 12,
     },
     content: {
       padding: 24,
@@ -130,10 +158,31 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"]) {
       borderRadius: 9999,
       paddingHorizontal: 14,
       paddingVertical: 8,
+      minWidth: 74,
+      alignItems: "center",
+    },
+    unblockButtonDisabled: {
+      opacity: 0.6,
     },
     unblockText: {
       color: theme.colors.semantic.error,
       fontSize: 12,
+      fontWeight: "700",
+    },
+    errorText: {
+      color: theme.colors.semantic.error,
+      fontSize: 14,
+      textAlign: "center",
+    },
+    retryButton: {
+      borderRadius: theme.radius.full,
+      backgroundColor: theme.colors.brand.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    retryText: {
+      color: theme.colors.text.onBrand,
+      fontSize: 14,
       fontWeight: "700",
     },
     empty: {

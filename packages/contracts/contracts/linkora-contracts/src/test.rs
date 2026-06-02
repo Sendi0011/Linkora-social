@@ -2259,6 +2259,25 @@ fn test_profile_write_extends_ttl() {
     );
 }
 
+#[test]
+fn test_instance_storage_ttl_extended_after_mutation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    // Mutating call should extend instance storage TTL for contract keys.
+    client.set_fee(&250);
+
+    let contract_id = client.address.clone();
+    let fee_ttl = env.as_contract(&contract_id, || {
+        env.storage().instance().get_ttl(&FEE_BPS)
+    });
+    assert!(
+        fee_ttl >= LEDGER_THRESHOLD,
+        "instance storage TTL {fee_ttl} below LEDGER_THRESHOLD after mutating call"
+    );
+}
+
 // ── Issue #322: Tip cooldown tests ────────────────────────────────────────────
 
 #[test]

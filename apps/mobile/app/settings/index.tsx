@@ -9,9 +9,12 @@ import {
   View,
 } from "react-native";
 
+import { useRouter } from "expo-router";
+
 import { useNetwork } from "../../hooks/useNetwork";
 
 export default function SettingsScreen(): JSX.Element {
+  const router = useRouter();
   const {
     network,
     rpcUrl,
@@ -128,6 +131,17 @@ export default function SettingsScreen(): JSX.Element {
         <View style={styles.codeBox}>
           <Text style={styles.code}>{contractId}</Text>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() =>
+            router.push("/settings/blocked" as Parameters<typeof router.push>[0])
+          }
+        >
+          <Text style={styles.secondaryButtonText}>Manage blocked users</Text>
+        </Pressable>
       </View>
 
       <View style={styles.section}>

@@ -43,13 +43,13 @@ const DEFAULT_HANDLERS: Partial<Record<BridgePermission, BridgeHandler>> = {
   "wallet.sign": async (payload) => payload,
   "wallet.signTransaction": async (payload) => payload,
   "profile.get": async () => {
-  const address = await getWalletAddress();
-  if (!address) {
-    return null;
-  }
-  const creatorToken = await getItem<string>(StorageKey.AuthToken).catch(() => null);
-  return { address, username: null, creatorToken };
-},
+    const address = await getWalletAddress();
+    if (!address) {
+      return null;
+    }
+    const creatorToken = await getItem<string>(StorageKey.AuthToken).catch(() => null);
+    return { address, username: null, creatorToken };
+  },
   "profile.update": async (payload) => payload,
 };
 

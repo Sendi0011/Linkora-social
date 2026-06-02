@@ -64,6 +64,9 @@ importers:
       react-native-reanimated:
         specifier: ^4.4.0
         version: 4.4.0(react-native-worklets@0.9.1(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(react-native@0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
+      react-native-webview:
+        specifier: ^13.6.0
+        version: 13.6.0(react-native@0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
     optionalDependencies:
       "@stellar/freighter-api":
         specifier: ^2.0.0
@@ -10396,6 +10399,15 @@ packages:
     peerDependencies:
       react: "*"
       react-native: ">=0.82.0"
+
+  react-native-webview@13.6.0:
+    resolution:
+      {
+        integrity: sha512-KapVfHEj60e+2QplhqoCMdqW4vDzzvLS3YasfjVoMV4qhsZ3padncMEqOHX6AY4FIAdRzAxG0JQs+kXczAPYeQ==,
+      }
+    peerDependencies:
+      react: "*"
+      react-native: "*"
 
   react-native-worklets@0.9.1:
     resolution:
@@ -20734,6 +20746,13 @@ snapshots:
       react-freeze: 1.0.4(react@18.3.1)
       react-native: 0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)
       warn-once: 0.1.1
+
+  react-native-webview@13.6.0(react-native@0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1):
+    dependencies:
+      escape-string-regexp: 2.0.0
+      invariant: 2.2.4
+      react: 18.3.1
+      react-native: 0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)
 
   react-native-worklets@0.9.1(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(react-native@0.72.17(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1):
     dependencies:

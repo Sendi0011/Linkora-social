@@ -61,22 +61,22 @@ export default function MiniAppHostScreen() {
   const handleMessage = useCallback(
     async (event: { nativeEvent: { data: string } }) => {
       if (!bridge) return;
-      let parsed: { id: number; method: string; payload?: unknown };
+      let parsed: { id: number; method: string; payload?: unknown } | null = null;
       try {
         parsed = JSON.parse(event.nativeEvent.data);
         const result = await bridge.call(parsed.method, parsed.payload);
         webviewRef.current?.injectJavaScript(
-          `window.LinkoraBridge._handleResponse(${parsed.id}, null, ${JSON.stringify(result)});true;`,
+          `window.LinkoraBridge._handleResponse(${parsed.id}, null, ${JSON.stringify(result)});true;`
         );
       } catch (err) {
         const msgId = parsed?.id ?? 0;
         const message = err instanceof Error ? err.message : "Bridge call failed";
         webviewRef.current?.injectJavaScript(
-          `window.LinkoraBridge._handleResponse(${msgId}, ${JSON.stringify(message)}, null);true;`,
+          `window.LinkoraBridge._handleResponse(${msgId}, ${JSON.stringify(message)}, null);true;`
         );
       }
     },
-    [bridge],
+    [bridge]
   );
 
   const handleReload = useCallback(() => {

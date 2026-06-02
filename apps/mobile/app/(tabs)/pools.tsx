@@ -1,10 +1,15 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { PoolCard } from "../../components/PoolCard";
 import { usePools } from "../../hooks/usePools";
-import { EmptyState } from "../../components/EmptyState";
-
 import { EmptyState } from "../../components/states/EmptyState";
 
 export default function PoolsScreen() {
@@ -59,8 +64,9 @@ export default function PoolsScreen() {
           <Text style={styles.subtitle}>Community funding pools</Text>
         </View>
         <EmptyState
+          icon="◎"
           title="No pools available"
-          message="Check back soon for community funding opportunities"
+          subtitle="Check back soon for community funding opportunities"
         />
       </View>
     );

@@ -1,10 +1,12 @@
 import React from "react";
 import { FlatList, StyleSheet, ActivityIndicator, RefreshControl, View } from "react-native";
 import { useRouter } from "expo-router";
-import { PostCard, PostCardSkeleton, Post } from "../../components/PostCard";
+import { PostCard, Post } from "../../components/PostCard";
+import { PostCardSkeleton } from "../../components/skeletons/PostCardSkeleton";
 import { EmptyState } from "../../components/states/EmptyState";
 import { ErrorState } from "../../components/states/ErrorState";
 import { useFeed } from "../../hooks/useFeed";
+import { useTheme } from "../../theme/useTheme";
 
 const SKELETON_COUNT = 4;
 
@@ -20,6 +22,7 @@ function SkeletonList() {
 
 export default function FeedScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
   const { posts, loading, error, loadMore, refresh } = useFeed();
 
   const isInitialLoad = loading && posts.length === 0;

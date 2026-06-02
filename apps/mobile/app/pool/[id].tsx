@@ -196,10 +196,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   historyButtonText: {
-    color: "#e2e8f0",
     fontSize: 12,
     fontWeight: "700",
     color: "#f1f5f9",
+    marginBottom: 24,
+    fontFamily: "monospace",
+  },
+  label: {
+    color: "#94a3b8",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  id: {
+    color: "#f8fafc",
+    fontSize: 20,
+    fontWeight: "800",
     marginBottom: 24,
     fontFamily: "monospace",
   },
@@ -223,12 +236,6 @@ const styles = StyleSheet.create({
   },
   adminItem: {
     paddingVertical: 8,
-  },
-  adminAddress: {
-    fontSize: 14,
-    color: "#cbd5e1",
-    fontFamily: "monospace",
-    marginBottom: 4,
   },
   adminSection: {
     marginTop: 24,

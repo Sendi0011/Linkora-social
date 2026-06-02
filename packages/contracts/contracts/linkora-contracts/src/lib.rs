@@ -359,6 +359,7 @@ impl LinkoraContract {
     // ── Initialization ────────────────────────────────────────────────────────
 
     pub fn initialize(env: Env, admin: Address, treasury: Address, fee_bps: u32) {
+        Self::bump_instance(&env);
         if env
             .storage()
             .instance()
@@ -380,6 +381,7 @@ impl LinkoraContract {
     // ── Profiles ──────────────────────────────────────────────────────────────
 
     pub fn set_profile(env: Env, user: Address, username: String, creator_token: Address) {
+        Self::bump_instance(&env);
         user.require_auth();
         validate_username(&username).expect("invalid username");
 
@@ -452,6 +454,7 @@ impl LinkoraContract {
     }
 
     pub fn delete_profile(env: Env, user: Address) {
+        Self::bump_instance(&env);
         user.require_auth();
         let key = StorageKey::Profile(user.clone());
         let profile: Profile = env
@@ -489,6 +492,7 @@ impl LinkoraContract {
     // ── Social Graph ──────────────────────────────────────────────────────────
 
     pub fn follow(env: Env, follower: Address, followee: Address) {
+        Self::bump_instance(&env);
         follower.require_auth();
 
         if Self::is_blocked(env.clone(), followee.clone(), follower.clone()) {
@@ -526,6 +530,7 @@ impl LinkoraContract {
     }
 
     pub fn unfollow(env: Env, follower: Address, followee: Address) {
+        Self::bump_instance(&env);
         follower.require_auth();
 
         let following_key = StorageKey::Following(follower.clone());
@@ -597,6 +602,7 @@ impl LinkoraContract {
     // ── Block List ────────────────────────────────────────────────────────────
 
     pub fn block_user(env: Env, blocker: Address, blocked: Address) {
+        Self::bump_instance(&env);
         blocker.require_auth();
         let key = StorageKey::Blocks(blocker.clone());
         let mut blocks: Map<Address, ()> = env
@@ -611,6 +617,7 @@ impl LinkoraContract {
     }
 
     pub fn unblock_user(env: Env, blocker: Address, blocked: Address) {
+        Self::bump_instance(&env);
         blocker.require_auth();
         let key = StorageKey::Blocks(blocker.clone());
         let mut blocks: Map<Address, ()> = env
@@ -636,6 +643,7 @@ impl LinkoraContract {
     // ── Posts ─────────────────────────────────────────────────────────────────
 
     pub fn create_post(env: Env, author: Address, content: String) -> u64 {
+        Self::bump_instance(&env);
         author.require_auth();
         validate_content(&content).expect("invalid content");
 
@@ -686,6 +694,7 @@ impl LinkoraContract {
     }
 
     pub fn delete_post(env: Env, author: Address, post_id: u64) {
+        Self::bump_instance(&env);
         author.require_auth();
         let key = StorageKey::Post(post_id);
         let post: Post = env.storage().persistent().get(&key).unwrap_or_else(|| {
@@ -739,6 +748,7 @@ impl LinkoraContract {
     // ── Reactions ─────────────────────────────────────────────────────────────
 
     pub fn like_post(env: Env, user: Address, post_id: u64) {
+        Self::bump_instance(&env);
         user.require_auth();
 
         let like_key = StorageKey::Like(post_id, user.clone());
@@ -774,6 +784,7 @@ impl LinkoraContract {
     // ── Tipping ───────────────────────────────────────────────────────────────
 
     pub fn tip(env: Env, tipper: Address, post_id: u64, token: Address, amount: i128) {
+        Self::bump_instance(&env);
         assert!(amount > 0, "tip amount must be positive");
         tipper.require_auth();
 
@@ -848,6 +859,7 @@ impl LinkoraContract {
         initial_admins: Vec<Address>,
         threshold: u32,
     ) {
+        Self::bump_instance(&env);
         admin.require_auth();
         Self::require_admin(&env);
         let key = StorageKey::Pool(pool_id.clone());
@@ -887,6 +899,7 @@ impl LinkoraContract {
         token: Address,
         amount: i128,
     ) {
+        Self::bump_instance(&env);
         assert!(amount > 0, "must be positive");
         depositor.require_auth();
         let key = StorageKey::Pool(pool_id.clone());
@@ -922,6 +935,7 @@ impl LinkoraContract {
         amount: i128,
         recipient: Address,
     ) {
+        Self::bump_instance(&env);
         assert!(amount > 0, "must be positive");
         let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
@@ -978,6 +992,7 @@ impl LinkoraContract {
     }
 
     pub fn add_pool_admin(env: Env, signers: Vec<Address>, pool_id: Symbol, new_admin: Address) {
+        Self::bump_instance(&env);
         let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
             .storage()
@@ -1007,6 +1022,7 @@ impl LinkoraContract {
     }
 
     pub fn remove_pool_admin(env: Env, signers: Vec<Address>, pool_id: Symbol, admin: Address) {
+        Self::bump_instance(&env);
         let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
             .storage()
@@ -1045,6 +1061,7 @@ impl LinkoraContract {
     }
 
     pub fn update_pool_threshold(env: Env, signers: Vec<Address>, pool_id: Symbol, threshold: u32) {
+        Self::bump_instance(&env);
         assert!(threshold > 0, "threshold must be positive");
         let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
@@ -1083,6 +1100,7 @@ impl LinkoraContract {
     // ── Fee & Treasury ────────────────────────────────────────────────────────
 
     pub fn set_fee(env: Env, fee_bps: u32) {
+        Self::bump_instance(&env);
         Self::require_admin(&env);
         assert!(fee_bps <= 10_000, "invalid fee");
         let old_fee_bps = Self::get_fee_bps(env.clone());
@@ -1096,6 +1114,7 @@ impl LinkoraContract {
     }
 
     pub fn set_treasury(env: Env, treasury: Address) {
+        Self::bump_instance(&env);
         Self::require_admin(&env);
         let old_treasury = Self::get_treasury(env.clone()).expect("treasury not set");
         env.storage().instance().set(&TREASURY, &treasury);
@@ -1116,6 +1135,7 @@ impl LinkoraContract {
     }
 
     pub fn set_tip_cooldown_window(env: Env, cooldown_ledgers: u32) {
+        Self::bump_instance(&env);
         Self::require_admin(&env);
         assert!(cooldown_ledgers > 0, "cooldown must be positive");
         env.storage()
@@ -1133,6 +1153,7 @@ impl LinkoraContract {
     // ── Upgradability ─────────────────────────────────────────────────────────
 
     pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
+        Self::bump_instance(&env);
         Self::require_admin(&env);
         env.deployer()
             .update_current_contract_wasm(new_wasm_hash.clone());
@@ -1163,6 +1184,13 @@ impl LinkoraContract {
         env.storage()
             .temporary()
             .extend_ttl(key, LEDGER_THRESHOLD, LEDGER_BUMP);
+    }
+
+    /// Extend the TTL of instance storage entries on every mutating operation.
+    fn bump_instance(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(LEDGER_THRESHOLD, LEDGER_BUMP);
     }
 }
 

@@ -36,6 +36,29 @@ export default function ProfileScreen() {
             <Text style={styles.detailValue}>{rpcUrl}</Text>
           </View>
 
+          <View style={styles.linkRow}>
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() =>
+                router.push(
+                  `/profile/followers?address=${address}` as Parameters<typeof router.push>[0],
+                )
+              }
+            >
+              <Text style={styles.linkButtonText}>Followers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() =>
+                router.push(
+                  `/profile/following?address=${address}` as Parameters<typeof router.push>[0],
+                )
+              }
+            >
+              <Text style={styles.linkButtonText}>Following</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={styles.button}
             onPress={() => router.push("/settings" as Parameters<typeof router.push>[0])}
@@ -113,6 +136,25 @@ const styles = StyleSheet.create({
     color: "#e2e8f0",
     fontSize: 12,
     lineHeight: 18,
+  },
+  linkRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  linkButton: {
+    flex: 1,
+    backgroundColor: "#1e293b",
+    borderWidth: 1,
+    borderColor: "#334155",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  linkButtonText: {
+    color: "#e2e8f0",
+    fontWeight: "600",
+    fontSize: 14,
   },
   button: {
     backgroundColor: "#6366f1",

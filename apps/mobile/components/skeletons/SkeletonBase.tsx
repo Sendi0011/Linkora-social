@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { StyleSheet, View, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import type { DimensionValue, ViewStyle } from "react-native";
 import Animated, {
   Easing,
   cancelAnimation,
@@ -78,7 +79,7 @@ export function SkeletonLine({
   height = 12,
   style,
 }: {
-  width: number | string;
+  width: DimensionValue;
   height?: number;
   style?: ViewStyle;
 }) {
