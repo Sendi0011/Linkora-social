@@ -30,7 +30,6 @@ pub enum StorageKey {
     // ── End-to-end encrypted direct messages ──────────────────────────────
     DmPublicKey(Address),      // persistent: user -> X25519 public key for E2EE DMs
 }
-}
 
 // ── Instance-storage key constants (small scalars, not contracttype) ──────────
 
@@ -516,15 +515,16 @@ impl LinkoraContract {
     pub fn publish_dm_key(env: Env, user: Address, x25519_pubkey: BytesN<32>) {
         Self::bump_instance(&env);
         user.require_auth();
-        
+
         let key = StorageKey::DmPublicKey(user.clone());
         env.storage().persistent().set(&key, &x25519_pubkey);
         Self::bump(&env, &key);
-        
+
         DmKeyPublishedEvent {
             user,
             public_key: x25519_pubkey,
-        }.publish(&env);
+        }
+        .publish(&env);
     }
 
     /// Retrieve a user's X25519 public key for encrypted direct messages.
