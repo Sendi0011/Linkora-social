@@ -29,6 +29,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
+        working-directory: packages/web
         run: pnpm exec playwright install --with-deps
 
       - name: Set up environment variables for localhost testing
