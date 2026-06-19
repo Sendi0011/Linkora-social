@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.45.0
+        version: 1.60.0
       '@stellar/stellar-sdk':
         specifier: ^15.1.0
         version: 15.1.0
