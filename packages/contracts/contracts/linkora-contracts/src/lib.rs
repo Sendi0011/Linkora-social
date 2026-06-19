@@ -32,6 +32,9 @@ pub enum StorageKey {
     GovVote(u64, Address), // persistent: (proposal_id, voter) -> bool (prevents double-voting)
     GovConfig,             // persistent: governance configuration
     GovProposalCount,      // persistent: next proposal id counter
+    // ── Analytics Oracle ──────────────────────────────────────────────────
+    OracleKey(Symbol),               // persistent: oracle_name -> BytesN<32> Ed25519 pubkey
+    AttestationNullifier(BytesN<32>), // persistent: sha256(report_cbor) -> bool (replay guard)
 }
 
 // ── Instance-storage key constants (small scalars, not contracttype) ──────────
@@ -402,6 +405,15 @@ pub struct GovProposalVetoedEvent {
 pub struct EmergencyBypassEvent {
     #[topic]
     pub action: Symbol,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct AttestationVerifiedEvent {
+    #[topic]
+    pub oracle_name: Symbol,
+    #[topic]
+    pub report_hash: BytesN<32>,
 }
 
 // ── Contract ──────────────────────────────────────────────────────────────────
@@ -1713,6 +1725,69 @@ impl LinkoraContract {
             .expect("proposal not found");
         Self::bump(&env, &key);
         proposal
+    }
+
+    // ── Analytics Oracle ──────────────────────────────────────────────────────
+
+    /// Register or rotate an Ed25519 oracle public key. Admin only.
+    pub fn register_oracle(env: Env, admin: Address, name: Symbol, pubkey: BytesN<32>) {
+        Self::bump_instance(&env);
+        admin.require_auth();
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .expect("not initialized");
+        assert!(admin == stored_admin, "not admin");
+        let key = StorageKey::OracleKey(name);
+        env.storage().persistent().set(&key, &pubkey);
+        Self::bump(&env, &key);
+    }
+
+    /// Verify a signed analytics attestation.
+    ///
+    /// Computes `sha256(report_cbor)`, verifies the Ed25519 `signature` against the
+    /// registered oracle pubkey, checks the nullifier has not been used, records it,
+    /// and emits `AttestationVerifiedEvent`. Returns `true` on success.
+    pub fn verify_analytics_attestation(
+        env: Env,
+        oracle_name: Symbol,
+        report_cbor: soroban_sdk::Bytes,
+        signature: BytesN<64>,
+    ) -> bool {
+        let oracle_key = StorageKey::OracleKey(oracle_name.clone());
+        let pubkey: BytesN<32> = env
+            .storage()
+            .persistent()
+            .get(&oracle_key)
+            .expect("oracle not registered");
+        Self::bump(&env, &oracle_key);
+
+        // Compute sha256 digest of the report bytes.
+        let report_hash: BytesN<32> = env.crypto().sha256(&report_cbor).into();
+
+        // Replay protection: reject if this exact report has been attested before.
+        let nullifier_key = StorageKey::AttestationNullifier(report_hash.clone());
+        assert!(
+            !env.storage().persistent().has(&nullifier_key),
+            "attestation already submitted"
+        );
+
+        // Verify Ed25519 signature: ed25519_verify(pubkey, message, signature).
+        env.crypto()
+            .ed25519_verify(&pubkey, &report_hash.clone().into(), &signature);
+
+        // Record nullifier to prevent replay.
+        env.storage().persistent().set(&nullifier_key, &true);
+        Self::bump(&env, &nullifier_key);
+
+        AttestationVerifiedEvent {
+            oracle_name,
+            report_hash,
+        }
+        .publish(&env);
+
+        true
     }
 
     // ── Upgradability ─────────────────────────────────────────────────────────

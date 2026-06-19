@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { PostCard, Post } from "../../components/PostCard";
 import { TipModal } from "../../components/TipModal";
 import { ProfileHeader } from "../../components/ProfileHeader";
+import { AnalyticsCard } from "../../components/AnalyticsCard";
 
 // In a real app this comes from a wallet context / auth hook.
 const MOCK_CURRENT_USER = "";
@@ -292,6 +293,9 @@ export default function ProfilePage() {
         onFollow={handleFollow}
         onUnfollow={handleUnfollow}
       />
+
+      {/* ── Analytics ─────────────────────────────────────────────────── */}
+      <AnalyticsCard creatorAddress={profile.address} />
 
       {/* ── Post list ──────────────────────────────────────────────────── */}
       <section>

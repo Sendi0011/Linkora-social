@@ -378,4 +378,28 @@ export class LinkoraClient {
   setTipCooldownWindow(cooldownLedgers: number): string {
     return this.buildTx("set_tip_cooldown_window", scvU32(cooldownLedgers));
   }
+
+  // ── Analytics Oracle ────────────────────────────────────────────────────────
+
+  /**
+   * Build a transaction envelope for `verify_analytics_attestation`.
+   * Submitting this transaction anchors the attestation on-chain and emits
+   * `AttestationVerifiedEvent`.
+   *
+   * @param oracleName - Symbol name of the oracle (e.g. "default")
+   * @param reportCbor - Raw CBOR bytes of the analytics report
+   * @param signature  - 64-byte Ed25519 signature over sha256(reportCbor)
+   */
+  verifyAnalyticsAttestation(
+    oracleName: string,
+    reportCbor: Uint8Array,
+    signature: Uint8Array
+  ): string {
+    return this.buildTx(
+      "verify_analytics_attestation",
+      scvSymbol(oracleName),
+      nativeToScVal(Buffer.from(reportCbor), { type: "bytes" }),
+      nativeToScVal(Buffer.from(signature), { type: "bytes" })
+    );
+  }
 }

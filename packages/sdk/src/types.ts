@@ -24,3 +24,22 @@ export interface Pool {
   admins: string[];
   threshold: number;
 }
+
+/** Analytics attestation returned by the oracle service API. */
+export interface AnalyticsAttestation {
+  oracleName: string;
+  reportHash: string;
+  reportCbor: string;
+  signature: string;
+  submittedAt: number;
+  report: {
+    version: number;
+    creator: string;
+    windowStart: string;
+    windowEnd: string;
+    totalTips: string;
+    postCount: string;
+    followerDelta: string;
+    uniqueTippers: number;
+  };
+}
