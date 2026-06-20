@@ -55,6 +55,22 @@
     "typedoc": "^0.27.9",
     "typescript": "^5.8.3"
   },
+  "peerDependencies": {
+    "@ledgerhq/hw-transport-webhid": "^9.0.0",
+    "@ledgerhq/hw-transport-node-hid": "^6.0.0",
+    "@ledgerhq/hw-app-str": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ledgerhq/hw-transport-webhid": {
+      "optional": true
+    },
+    "@ledgerhq/hw-transport-node-hid": {
+      "optional": true
+    },
+    "@ledgerhq/hw-app-str": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=18"
   }

@@ -45,6 +45,19 @@ export class InvalidInputError extends LinkoraError {}
 export class InvalidManifestError extends LinkoraError {}
 
 /**
+ * Thrown when transaction simulation fails. Contains the full diagnostic event log.
+ */
+export class SimulationError extends LinkoraError {
+  constructor(
+    message: string,
+    public readonly eventLog?: unknown,
+    originalError?: unknown
+  ) {
+    super(message, originalError);
+  }
+}
+
+/**
  * Maps a raw error string or transaction simulation response error to a specific LinkoraError subclass.
  *
  * @param err The caught raw error object or string.
