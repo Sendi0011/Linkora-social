@@ -3,7 +3,7 @@
 use super::*;
 use soroban_sdk::{
     symbol_short,
-    testutils::{storage::Persistent as _, Address as _, Events, Ledger},
+    testutils::{Address as _, Events, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
     vec, Address, BytesN, Env, String,
 };
@@ -3249,34 +3249,12 @@ fn test_profile_expiry_detection() {
     let token = Address::generate(&env);
     client.set_profile(&user, &String::from_str(&env, "alice"), &token);
 
-    let key = StorageKey::Profile(user.clone());
-
-    std::println!("=== BEFORE ADVANCING SEQUENCE ===");
-    std::println!("Ledger Sequence: {}", env.ledger().sequence());
-    env.as_contract(&client.address, || {
-        std::println!("Has Profile Key: {}", env.storage().persistent().has(&key));
-        std::println!(
-            "Profile Key TTL: {}",
-            env.storage().persistent().get_ttl(&key)
-        );
-    });
-
     // Profile should be retrievable initially
     assert!(client.get_profile(&user).is_some());
 
-    // Advance ledger sequence past the LEDGER_BUMP
+    // Advance ledger sequence past the maximum possible TTL (6,312,000)
     env.ledger().with_mut(|li| {
-        li.sequence_number += 535_001;
-    });
-
-    std::println!("=== AFTER ADVANCING SEQUENCE ===");
-    std::println!("Ledger Sequence: {}", env.ledger().sequence());
-    env.as_contract(&client.address, || {
-        std::println!("Has Profile Key: {}", env.storage().persistent().has(&key));
-        std::println!(
-            "Profile Key TTL: {}",
-            env.storage().persistent().get_ttl(&key)
-        );
+        li.sequence_number += 10_000_000;
     });
 
     // Calling try_get_profile should fail with RentError::Expired (error code 1)
