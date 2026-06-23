@@ -74,6 +74,13 @@ async function ensureSchema(): Promise<void> {
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS indexer_state (
+      ledger_sequence BIGINT      PRIMARY KEY,
+      state_root      TEXT        NOT NULL,
+      computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 // ── Event normalisation ─────────────────────────────────────────────────────
@@ -156,6 +163,11 @@ async function main(): Promise<void> {
   httpServer.listen(PORT, () => {
     console.log(`[indexer] HTTP + WS listening on :${PORT} (ws path /ws)`);
   });
+
+  // Start gossip in the background.
+  startGossip(pgPool, abortController.signal).catch((err) =>
+    console.error("[gossip] Fatal error:", err)
+  );
 
   await streamEvents(
     {
