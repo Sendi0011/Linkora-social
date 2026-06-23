@@ -123,9 +123,12 @@ importers:
       "@stellar/freighter-api":
         specifier: ^2.0.0
         version: 2.0.0
+      linkora-sdk:
+        specifier: workspace:*
+        version: link:../../packages/sdk
       next:
         specifier: 15.5.19
-        version: 15.5.19(@playwright/test@1.60.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 15.5.19(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -136,6 +139,18 @@ importers:
       "@tailwindcss/postcss":
         specifier: ^4
         version: 4.3.0
+      "@testing-library/jest-dom":
+        specifier: ^6.1.5
+        version: 6.9.1
+      "@testing-library/react":
+        specifier: ^14.1.2
+        version: 14.3.1(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      "@types/jest":
+        specifier: ^29.5.11
+        version: 29.5.14
+      "@types/jest-axe":
+        specifier: ^3.5.9
+        version: 3.5.9
       "@types/node":
         specifier: ^22
         version: 22.19.19
@@ -145,6 +160,18 @@ importers:
       "@types/react-dom":
         specifier: ^19
         version: 19.2.3(@types/react@19.2.16)
+      axe-core:
+        specifier: ^4.9.0
+        version: 4.11.3
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@22.19.19)(ts-node@10.9.2(@types/node@22.19.19)(typescript@5.9.3))
+      jest-axe:
+        specifier: ^8.0.0
+        version: 8.0.0
+      jest-environment-jsdom:
+        specifier: ^29.7.0
+        version: 29.7.0
       postcss:
         specifier: ^8
         version: 8.4.31
@@ -154,6 +181,9 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.3.0
+      ts-jest:
+        specifier: ^29.1.1
+        version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(jest-util@30.4.1)(jest@29.7.0(@types/node@22.19.19)(ts-node@10.9.2(@types/node@22.19.19)(typescript@5.9.3)))(typescript@5.9.3)
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -15563,6 +15593,16 @@ snapshots:
     transitivePeerDependencies:
       - "@types/react"
 
+  "@testing-library/react@14.3.1(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)":
+    dependencies:
+      "@babel/runtime": 7.29.7
+      "@testing-library/dom": 9.3.4
+      "@types/react-dom": 18.3.7(@types/react@19.2.16)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+    transitivePeerDependencies:
+      - "@types/react"
+
   "@tootallnate/once@2.0.1": {}
 
   "@tsconfig/node10@1.0.12": {}
@@ -15717,6 +15757,10 @@ snapshots:
   "@types/react-dom@18.3.7(@types/react@18.3.28)":
     dependencies:
       "@types/react": 18.3.28
+
+  "@types/react-dom@18.3.7(@types/react@19.2.16)":
+    dependencies:
+      "@types/react": 19.2.16
 
   "@types/react-dom@19.2.3(@types/react@19.2.16)":
     dependencies:
@@ -19086,7 +19130,7 @@ snapshots:
       micromatch: 4.0.8
       walker: 1.0.8
     optionalDependencies:
-      fsevents: 2.3.2
+      fsevents: 2.3.3
 
   jest-haste-map@30.4.1:
     dependencies:
@@ -20374,7 +20418,7 @@ snapshots:
       - "@babel/core"
       - babel-plugin-macros
 
-  next@15.5.19(@playwright/test@1.60.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@15.5.19(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       "@next/env": 15.5.19
       "@swc/helpers": 0.5.15
@@ -20382,7 +20426,7 @@ snapshots:
       postcss: 8.4.31
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
-      styled-jsx: 5.1.6(react@19.2.7)
+      styled-jsx: 5.1.6(@babel/core@7.29.7)(react@19.2.7)
     optionalDependencies:
       "@next/swc-darwin-arm64": 15.5.19
       "@next/swc-darwin-x64": 15.5.19
@@ -21766,10 +21810,12 @@ snapshots:
     optionalDependencies:
       "@babel/core": 7.29.7
 
-  styled-jsx@5.1.6(react@19.2.7):
+  styled-jsx@5.1.6(@babel/core@7.29.7)(react@19.2.7):
     dependencies:
       client-only: 0.0.1
       react: 19.2.7
+    optionalDependencies:
+      "@babel/core": 7.29.7
 
   sucrase@3.35.1:
     dependencies:
