@@ -113,8 +113,7 @@ export class PostgresDatabase implements Database {
   // ───────────────────────────────── Posts ────────────────────────────────────
 
   async insertPost(post: Post): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const content = (post as any).content ?? "";
+    const content = (post as { content?: string }).content ?? "";
 
     await this.pool.query(
       `

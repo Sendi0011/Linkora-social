@@ -183,6 +183,7 @@ psql "$DATABASE_URL" -f migrations/003_follows.sql
 psql "$DATABASE_URL" -f migrations/004_tips_likes.sql
 psql "$DATABASE_URL" -f migrations/005_pools.sql
 psql "$DATABASE_URL" -f migrations/006_raw_events.sql
+psql "$DATABASE_URL" -f migrations/007_device_tokens.sql
 ```
 
 ### Configuration

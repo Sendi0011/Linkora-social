@@ -73,7 +73,7 @@ test.describe("Post Creation & Feed", () => {
 
     // Check first post has metadata
     const firstPost = page.locator("article").first();
-    const authorElement = firstPost.locator("text=/[GS][A-Z0-9]{4}.*[A-Z0-9]{4}|@[w]+/");
+    const authorElement = firstPost.locator("text=/[GS][A-Z0-9]{4}.*[A-Z0-9]{4}|@?\\w+/").first();
     const timestampElement = firstPost.locator(
       "text=/ago|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/"
     );

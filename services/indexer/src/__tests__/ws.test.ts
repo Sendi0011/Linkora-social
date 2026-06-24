@@ -72,8 +72,12 @@ describe("WebSocket fanout", () => {
     const client = await connect(h.port);
     await waitFor(() => h.handle.clientCount() === 1);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const received = new Promise<{ frame: any; at: number }>((resolve) => {
+    interface ReceivedFrame {
+      frame: unknown;
+      at: number;
+    }
+
+    const received = new Promise<ReceivedFrame>((resolve) => {
       client.on("message", (data) =>
         resolve({ frame: JSON.parse(data.toString()), at: Date.now() })
       );
@@ -137,8 +141,12 @@ describe("WebSocket fanout", () => {
     await waitFor(() => h.handle.clientCount() === 1);
 
     // Subscribe to only "Follow" and wait for the ack.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ack = new Promise<any>((resolve) => {
+    interface AckFrame {
+      type: string;
+      payload: { types: string[] };
+    }
+
+    const ack = new Promise<AckFrame>((resolve) => {
       client.on("message", (data) => {
         const frame = JSON.parse(data.toString());
         if (frame.type === "subscribed") resolve(frame);

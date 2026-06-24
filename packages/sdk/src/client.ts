@@ -51,6 +51,28 @@ export interface ClientConfig {
   contractId: string;
   rpcUrl: string;
   networkPassphrase?: string;
+  /** Contract ID of the token factory contract */
+  tokenFactoryId?: string;
+}
+
+/**
+ * Parameters for deploying a creator token via the factory.
+ */
+export interface DeployCreatorTokenParams {
+  deployer: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  initialSupply: bigint;
+}
+
+/**
+ * Parameters for setting a profile with a new token in one flow.
+ */
+export interface SetProfileWithNewTokenParams {
+  user: string;
+  username: string;
+  tokenParams: Omit<DeployCreatorTokenParams, "deployer">;
 }
 
 /**
@@ -60,11 +82,13 @@ export class LinkoraClient {
   private contractId: string;
   private rpcUrl: string;
   private networkPassphrase: string;
+  private tokenFactoryId: string | null;
 
   constructor(config: ClientConfig) {
     this.contractId = config.contractId;
     this.rpcUrl = config.rpcUrl;
     this.networkPassphrase = config.networkPassphrase || DEFAULT_NETWORK;
+    this.tokenFactoryId = config.tokenFactoryId ?? null;
   }
 
   private async simulateCall(method: string, ...args: xdr.ScVal[]): Promise<xdr.ScVal | null> {
@@ -278,7 +302,11 @@ export class LinkoraClient {
     if (x25519PubKey.length !== 32) {
       throw new Error("X25519 public key must be exactly 32 bytes");
     }
-    return this.buildTx("publish_dm_key", scvAddress(user), nativeToScVal(Array.from(x25519PubKey), { type: "bytes" }));
+    return this.buildTx(
+      "publish_dm_key",
+      scvAddress(user),
+      nativeToScVal(Array.from(x25519PubKey), { type: "bytes" })
+    );
   }
 
   createPost(author: string, content: string): string {
@@ -398,5 +426,135 @@ export class LinkoraClient {
 
   setTipCooldownWindow(cooldownLedgers: number): string {
     return this.buildTx("set_tip_cooldown_window", scvU32(cooldownLedgers));
+  }
+
+  // ── Token Factory Methods ────────────────────────────────────────────────────
+
+  /**
+   * Build a transaction XDR that calls `deploy_creator_token` on the token
+   * factory contract.  The caller must sign this XDR via Freighter and submit
+   * it before calling `setProfile` with the returned token address.
+   *
+   * Requires `tokenFactoryId` to be set in `ClientConfig`.
+   */
+  deployCreatorToken(params: DeployCreatorTokenParams): string {
+    if (!this.tokenFactoryId) {
+      throw new Error("tokenFactoryId must be set in ClientConfig to use deployCreatorToken");
+    }
+    return this.buildTxForContract(
+      this.tokenFactoryId,
+      "deploy_creator_token",
+      scvAddress(params.deployer),
+      scvString(params.name),
+      scvString(params.symbol),
+      scvU32(params.decimals),
+      scvI128(params.initialSupply)
+    );
+  }
+
+  /**
+   * Build two sequential transaction XDRs that together:
+   * 1. Deploy a creator token via the factory contract.
+   * 2. Call `set_profile` on the Linkora contract with the new token address.
+   *
+   * Returns an ordered array of XDR strings.  The caller must sign and submit
+   * them in sequence (e.g. via TransactionQueue) because the token address
+   * returned by (1) is needed as input for (2).
+   *
+   * IMPORTANT: In practice the token address from tx (1) must be extracted
+   * from the simulation result before (2) can be built with the real address.
+   * Use `simulateDeployCreatorToken` to get the token address first, then call
+   * `setProfile` with it.
+   *
+   * Requires `tokenFactoryId` to be set in `ClientConfig`.
+   */
+  setProfileWithNewToken(params: SetProfileWithNewTokenParams): [string, string] {
+    if (!this.tokenFactoryId) {
+      throw new Error("tokenFactoryId must be set in ClientConfig to use setProfileWithNewToken");
+    }
+    const deployTx = this.deployCreatorToken({
+      deployer: params.user,
+      ...params.tokenParams,
+    });
+    // NOTE: the token address used here is a placeholder; callers should
+    // first simulate deployCreatorToken to get the real token address, then
+    // call setProfile(user, username, tokenAddress) directly.  This method
+    // exists for TransactionQueue pre-building and testing the sequencing.
+    const profileTx = this.setProfile(params.user, params.username, params.user);
+    return [deployTx, profileTx];
+  }
+
+  /**
+   * Simulate `deploy_creator_token` to determine the token address that would
+   * be created.  Does not submit a transaction.
+   *
+   * Requires `tokenFactoryId` to be set in `ClientConfig`.
+   */
+  async simulateDeployCreatorToken(params: DeployCreatorTokenParams): Promise<string | null> {
+    if (!this.tokenFactoryId) {
+      throw new Error(
+        "tokenFactoryId must be set in ClientConfig to use simulateDeployCreatorToken"
+      );
+    }
+    const retval = await this.simulateCallOnContract(
+      this.tokenFactoryId,
+      "deploy_creator_token",
+      scvAddress(params.deployer),
+      scvString(params.name),
+      scvString(params.symbol),
+      scvU32(params.decimals),
+      scvI128(params.initialSupply)
+    );
+    if (!retval) return null;
+    const native = scValToNative(retval);
+    return native == null ? null : (native as string);
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────────────────
+
+  private buildTxForContract(contractId: string, method: string, ...args: xdr.ScVal[]): string {
+    const contract = new Contract(contractId);
+    const op = contract.call(method, ...args);
+
+    const source = Keypair.random();
+    const account = new Account(source.publicKey(), "0");
+    const tx = new TransactionBuilder(account, {
+      fee: "100",
+      networkPassphrase: this.networkPassphrase,
+    })
+      .addOperation(op)
+      .setTimeout(DEFAULT_TIMEOUT)
+      .build();
+
+    return tx.toEnvelope().toXDR("base64");
+  }
+
+  private async simulateCallOnContract(
+    contractId: string,
+    method: string,
+    ...args: xdr.ScVal[]
+  ): Promise<xdr.ScVal | null> {
+    const server = new rpc.Server(this.rpcUrl);
+    const contract = new Contract(contractId);
+    const op = contract.call(method, ...args);
+
+    const source = Keypair.random();
+    const account = new Account(source.publicKey(), "0");
+    const tx = new TransactionBuilder(account, {
+      fee: "100",
+      networkPassphrase: this.networkPassphrase,
+    })
+      .addOperation(op)
+      .setTimeout(DEFAULT_TIMEOUT)
+      .build();
+
+    const result = await server.simulateTransaction(tx);
+
+    if (isSimulationError(result)) {
+      throw mapError(result.error);
+    }
+    if (!isSimulationSuccess(result) || !result.result) return null;
+
+    return result.result.retval;
   }
 }

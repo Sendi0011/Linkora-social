@@ -4,6 +4,8 @@ import "./styles/globals.css";
 import { WalletProvider } from "./components/WalletProvider";
 import { ConnectWallet } from "./components/ConnectWallet";
 import { NotificationProvider } from "./context/NotificationContext";
+import { ComposeModal } from "./components/ComposeModal";
+import { NavComposeButton } from "./components/NavComposeButton";
 
 export const metadata: Metadata = {
   title: "Linkora Web",
@@ -65,11 +67,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <a href="/pools" style={navLink}>
                     Pools
                   </a>
+                  <NavComposeButton />
                   <ConnectWallet />
                 </div>
               </div>
             </nav>
             {children}
+            <ComposeModal />
           </WalletProvider>
         </NotificationProvider>
       </body>

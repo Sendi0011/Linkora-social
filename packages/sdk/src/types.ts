@@ -25,3 +25,10 @@ export interface Pool {
   admins: string[];
   threshold: number;
 }
+
+export interface CreatorTokenDeployedEvent {
+  deployer: string;
+  token_address: string;
+  name: string;
+  symbol: string;
+}
