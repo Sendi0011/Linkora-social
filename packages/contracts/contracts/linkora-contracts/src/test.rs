@@ -3243,13 +3243,6 @@ fn test_gov_veto_insufficient_pool_signers_panics() {
 fn test_profile_expiry_detection() {
     let env = Env::default();
     env.mock_all_auths();
-
-    // Set custom TTL parameters for the mock ledger to override defaults
-    env.ledger().with_mut(|li| {
-        li.min_persistent_entry_ttl = 100_000;
-        li.max_entry_ttl = 100_000;
-    });
-
     let (client, _, _) = setup_contract(&env);
 
     let user = Address::generate(&env);
@@ -3259,57 +3252,28 @@ fn test_profile_expiry_detection() {
     // Profile should be retrievable initially
     assert!(client.get_profile(&user).is_some());
 
+    // Simulate storage expiry: directly remove the Profile persistent key while
+    // keeping the REGISTERED_USERS registry in instance storage intact.
+    // This is exactly what the Soroban network does when a persistent entry's TTL
+    // reaches zero — the entry is archived and has() returns false.
     let key = StorageKey::Profile(user.clone());
-
-    std::println!("Sequence initially: {}", env.ledger().sequence());
     env.as_contract(&client.address, || {
-        std::println!(
-            "Profile TTL initially: {}",
-            env.storage().persistent().get_ttl(&key)
-        );
-        std::println!(
-            "Instance TTL initially: {}",
-            env.storage().instance().get_ttl()
-        );
+        env.storage().persistent().remove(&key);
     });
 
-    // Increase max_entry_ttl so we can extend the instance storage TTL without clamping
-    env.ledger().with_mut(|li| {
-        li.max_entry_ttl = 3_000_000;
-    });
-
-    // Extend instance storage TTL so it doesn't expire when sequence is advanced
-    env.as_contract(&client.address, || {
-        env.storage().instance().extend_ttl(2_000_000, 2_000_000);
-    });
-
-    env.as_contract(&client.address, || {
-        std::println!(
-            "Profile TTL after instance extension: {}",
-            env.storage().persistent().get_ttl(&key)
-        );
-        std::println!(
-            "Instance TTL after instance extension: {}",
-            env.storage().instance().get_ttl()
-        );
-    });
-
-    // Advance ledger sequence past the profile key's TTL (100,000), but within the extended instance storage TTL
-    env.ledger().with_mut(|li| {
-        li.sequence_number += 100_001;
-    });
-
-    std::println!("Sequence after advance: {}", env.ledger().sequence());
-    env.as_contract(&client.address, || {
-        std::println!("Has Profile: {}", env.storage().persistent().has(&key));
-    });
-
-    // Calling try_get_profile should fail with RentError::Expired (error code 1)
+    // get_profile should now detect the user as registered-but-expired and
+    // panic with RentError::Expired (contract error code 1).
     let res = client.try_get_profile(&user);
-    std::println!("Result: {:?}", res);
+    assert!(res.is_err());
 
-    panic!("debug panic to see output");
+    if let Err(Ok(err)) = res {
+        let expected_err = soroban_sdk::Error::from_contract_error(1);
+        assert_eq!(err, expected_err);
+    } else {
+        panic!("expected contract error RentError::Expired");
+    }
 }
+
 
 #[test]
 fn test_pay_rent_extends_ttl() {
