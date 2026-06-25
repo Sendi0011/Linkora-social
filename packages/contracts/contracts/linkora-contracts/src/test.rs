@@ -5,7 +5,7 @@ use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
-    vec, Address, BytesN, Env, String,
+    vec, Address, Bytes, BytesN, Env, String,
 };
 
 fn setup_token(env: &Env, admin: &Address) -> Address {
@@ -3661,4 +3661,144 @@ fn test_moderation_review_already_deleted_post() {
 
     let report_after = client.get_report(&post_id, &reporter).unwrap();
     assert_eq!(report_after.status, ReportStatus::Upheld);
+}
+
+fn credential_leaf(env: &Env, seed: u8) -> BytesN<32> {
+    let mut data = Bytes::new(env);
+    data.push_back(seed);
+    env.crypto().sha256(&data)
+}
+
+fn credential_pair_hash(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+    if LinkoraContract::bytesn_leq(left, right) {
+        credential_ordered_pair_hash(env, left, right)
+    } else {
+        credential_ordered_pair_hash(env, right, left)
+    }
+}
+
+fn credential_ordered_pair_hash(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+    let mut data = Bytes::new(env);
+    data.append(&left.to_bytes());
+    data.append(&right.to_bytes());
+    env.crypto().sha256(&data)
+}
+
+fn build_credential_proof(
+    env: &Env,
+    leaves: std::vec::Vec<BytesN<32>>,
+    target_leaf_index: usize,
+) -> (BytesN<32>, Vec<BytesN<32>>) {
+    let mut level = leaves;
+    let mut index = target_leaf_index;
+    let mut proof = Vec::new(env);
+
+    while level.len() > 1 {
+        if level.len() % 2 == 1 {
+            let last = level.last().unwrap().clone();
+            level.push(last);
+        }
+
+        let sibling_index = if index % 2 == 0 { index + 1 } else { index - 1 };
+        proof.push_back(level[sibling_index].clone());
+
+        let mut next = std::vec::Vec::new();
+        let mut i = 0;
+        while i < level.len() {
+            next.push(credential_pair_hash(env, &level[i], &level[i + 1]));
+            i += 2;
+        }
+
+        level = next;
+        index /= 2;
+    }
+
+    (level[0].clone(), proof)
+}
+
+#[test]
+fn test_credential_proof_round_trip() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let leaves = std::vec![
+        credential_leaf(&env, 1),
+        credential_leaf(&env, 2),
+        credential_leaf(&env, 3),
+        credential_leaf(&env, 4),
+    ];
+    let target_leaf = leaves[2].clone();
+    let (root, proof) = build_credential_proof(&env, leaves, 2);
+    let signature = BytesN::from_array(&env, &[0u8; 64]);
+    let nullifier = BytesN::from_array(&env, &[9u8; 32]);
+
+    client.update_credential_root(&user, &root, &signature);
+
+    assert_eq!(client.get_credential_root(&user), Some(root));
+    assert!(client.verify_credential(&user, &proof, &target_leaf, &nullifier));
+}
+
+#[test]
+fn test_credential_nullifier_replay_returns_false() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let leaves = std::vec![credential_leaf(&env, 10), credential_leaf(&env, 11)];
+    let target_leaf = leaves[0].clone();
+    let (root, proof) = build_credential_proof(&env, leaves, 0);
+    let signature = BytesN::from_array(&env, &[0u8; 64]);
+    let nullifier = BytesN::from_array(&env, &[7u8; 32]);
+
+    client.update_credential_root(&user, &root, &signature);
+
+    assert!(client.verify_credential(&user, &proof, &target_leaf, &nullifier));
+    assert!(!client.verify_credential(&user, &proof, &target_leaf, &nullifier));
+}
+
+#[test]
+fn test_credential_wrong_root_attack_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let alice_leaves = std::vec![credential_leaf(&env, 20), credential_leaf(&env, 21)];
+    let bob_leaves = std::vec![credential_leaf(&env, 30), credential_leaf(&env, 31)];
+
+    let alice_leaf = alice_leaves[1].clone();
+    let (alice_root, alice_proof) = build_credential_proof(&env, alice_leaves, 1);
+    let (bob_root, _) = build_credential_proof(&env, bob_leaves, 0);
+    let signature = BytesN::from_array(&env, &[0u8; 64]);
+    let nullifier = BytesN::from_array(&env, &[8u8; 32]);
+
+    client.update_credential_root(&alice, &alice_root, &signature);
+    client.update_credential_root(&bob, &bob_root, &signature);
+
+    assert!(!client.verify_credential(&bob, &alice_proof, &alice_leaf, &nullifier));
+}
+
+#[test]
+fn test_credential_depth_1024_leaf_tree() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let mut leaves = std::vec::Vec::new();
+    for i in 0..1024 {
+        leaves.push(credential_leaf(&env, (i % 251) as u8));
+    }
+    let target_leaf = leaves[511].clone();
+    let (root, proof) = build_credential_proof(&env, leaves, 511);
+    let signature = BytesN::from_array(&env, &[0u8; 64]);
+    let nullifier = BytesN::from_array(&env, &[6u8; 32]);
+
+    client.update_credential_root(&user, &root, &signature);
+
+    assert!(client.verify_credential(&user, &proof, &target_leaf, &nullifier));
 }

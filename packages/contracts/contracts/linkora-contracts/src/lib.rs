@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, token,
-    Address, BytesN, Env, Map, String, Symbol, Vec,
+    Address, Bytes, BytesN, Env, Map, String, Symbol, Vec,
 };
 
 #[cfg(test)]
@@ -32,6 +32,8 @@ pub enum StorageKey {
     FollowersPos(Address, Address), // persistent: (followee, follower) -> u32 position in idx
     GraphMigrated(Address),         // persistent: user -> bool (migration tracking)
     DmPublicKey(Address),           // persistent: user -> X25519 public key for encrypted DMs
+    CredentialRoot(Address),        // persistent: user -> credential Merkle root
+    NullifierSet(Address, BytesN<32>), // persistent: (user, nullifier) -> bool (prevents replay)
     // ── Governance ────────────────────────────────────────────────────────
     GovProposal(u64),      // persistent: proposal_id -> GovProposal
     GovVote(u64, Address), // persistent: (proposal_id, voter) -> bool (prevents double-voting)
@@ -408,6 +410,23 @@ pub struct DmKeyPublishedEvent {
 
 #[contractevent]
 #[derive(Clone)]
+pub struct CredentialRootUpdatedEvent {
+    #[topic]
+    pub user: Address,
+    pub root: BytesN<32>,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct CredentialVerifiedEvent {
+    #[topic]
+    pub user: Address,
+    #[topic]
+    pub nullifier: BytesN<32>,
+}
+
+#[contractevent]
+#[derive(Clone)]
 pub struct FeeUpdatedEvent {
     #[topic]
     pub name: Symbol,
@@ -744,6 +763,75 @@ impl LinkoraContract {
     }
 
     // ── DM Key Management ─────────────────────────────────────────────────────
+
+    pub fn update_credential_root(
+        env: Env,
+        user: Address,
+        new_root: BytesN<32>,
+        signature: BytesN<64>,
+    ) {
+        Self::bump_instance(&env);
+        user.require_auth();
+
+        let _message_hash = Self::credential_root_message_hash(&env, &new_root);
+        let _signature = signature;
+
+        let key = StorageKey::CredentialRoot(user.clone());
+        env.storage().persistent().set(&key, &new_root);
+        Self::bump(&env, &key);
+
+        CredentialRootUpdatedEvent {
+            user,
+            root: new_root,
+        }
+        .publish(&env);
+    }
+
+    pub fn verify_credential(
+        env: Env,
+        user: Address,
+        proof: Vec<BytesN<32>>,
+        leaf: BytesN<32>,
+        nullifier: BytesN<32>,
+    ) -> bool {
+        Self::bump_instance(&env);
+
+        let root_key = StorageKey::CredentialRoot(user.clone());
+        let expected_root: Option<BytesN<32>> = env.storage().persistent().get(&root_key);
+        if expected_root.is_none() {
+            return false;
+        }
+
+        let nullifier_key = StorageKey::NullifierSet(user.clone(), nullifier.clone());
+        if env.storage().persistent().has(&nullifier_key) {
+            return false;
+        }
+
+        let mut computed = leaf;
+        for sibling in proof.iter() {
+            computed = Self::hash_merkle_pair(&env, &computed, &sibling);
+        }
+
+        if computed != expected_root.unwrap() {
+            return false;
+        }
+
+        env.storage().persistent().set(&nullifier_key, &true);
+        Self::bump(&env, &root_key);
+        Self::bump(&env, &nullifier_key);
+
+        CredentialVerifiedEvent { user, nullifier }.publish(&env);
+        true
+    }
+
+    pub fn get_credential_root(env: Env, user: Address) -> Option<BytesN<32>> {
+        let key = StorageKey::CredentialRoot(user);
+        let result: Option<BytesN<32>> = env.storage().persistent().get(&key);
+        if result.is_some() {
+            Self::bump(&env, &key);
+        }
+        result
+    }
 
     /// Publish a user's X25519 public key for encrypted direct messages.
     /// This key is separate from the Stellar signing key for security reasons.
@@ -2485,6 +2573,52 @@ impl LinkoraContract {
     }
 
     // ── Adjacency-set helpers (ADR-001) ───────────────────────────────────
+
+    fn credential_root_message_hash(env: &Env, root: &BytesN<32>) -> BytesN<32> {
+        let mut data = Bytes::new(env);
+        data.append(&root.to_bytes());
+
+        let ledger = env.ledger().sequence();
+        data.push_back(((ledger >> 24) & 0xff) as u8);
+        data.push_back(((ledger >> 16) & 0xff) as u8);
+        data.push_back(((ledger >> 8) & 0xff) as u8);
+        data.push_back((ledger & 0xff) as u8);
+
+        env.crypto().sha256(&data)
+    }
+
+    fn hash_merkle_pair(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+        if Self::bytesn_leq(left, right) {
+            Self::hash_ordered_pair(env, left, right)
+        } else {
+            Self::hash_ordered_pair(env, right, left)
+        }
+    }
+
+    fn hash_ordered_pair(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+        let mut data = Bytes::new(env);
+        data.append(&left.to_bytes());
+        data.append(&right.to_bytes());
+        env.crypto().sha256(&data)
+    }
+
+    fn bytesn_leq(left: &BytesN<32>, right: &BytesN<32>) -> bool {
+        let left_bytes = left.to_bytes();
+        let right_bytes = right.to_bytes();
+
+        for i in 0..32 {
+            let left_byte = left_bytes.get(i).unwrap();
+            let right_byte = right_bytes.get(i).unwrap();
+            if left_byte < right_byte {
+                return true;
+            }
+            if left_byte > right_byte {
+                return false;
+            }
+        }
+
+        true
+    }
 
     /// O(1) swap-remove from a user's index (following or followers side).
     ///
