@@ -71,3 +71,43 @@ jobs:
 
       - name: Run unit tests
         run: cargo test
+
+  codegen-check:
+    name: Codegen Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
+
+      - name: Install stellar CLI
+        run: cargo install --locked stellar-cli
+
+      - name: Build contracts
+        run: pnpm build:contracts
+
+      - name: Run codegen
+        run: pnpm codegen
+
+      - name: Check generated files are up-to-date
+        run: git diff --exit-code packages/sdk/src/generated/

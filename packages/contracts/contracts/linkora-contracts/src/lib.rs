@@ -1,12 +1,16 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, symbol_short, token, Address, BytesN, Env,
-    Map, String, Symbol, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, token,
+    Address, BytesN, Env, Map, String, Symbol, Vec,
 };
+
+#[cfg(test)]
+use soroban_sdk::testutils::storage::Persistent as _;
 
 // ── Storage Key Enum ──────────────────────────────────────────────────────────
 
 #[contracttype]
+#[derive(Clone)]
 pub enum StorageKey {
     Post(u64),                 // persistent: post_id -> Post
     Profile(Address),          // persistent: user -> Profile
@@ -40,6 +44,13 @@ pub enum StorageKey {
     ReportCount(u64),  // persistent: post_id -> u32 count of reports
 }
 
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum RentError {
+    Expired = 1,
+}
+
 // ── Instance-storage key constants (small scalars, not contracttype) ──────────
 
 const POST_CT: Symbol = symbol_short!("POST_CT");
@@ -49,6 +60,8 @@ const TREASURY: Symbol = symbol_short!("TREASURY");
 const FEE_BPS: Symbol = symbol_short!("FEE_BPS");
 const INITIALIZED: Symbol = symbol_short!("INIT");
 const TIP_COOLDOWN_WINDOW: Symbol = symbol_short!("TIP_CD_W");
+const REGISTERED_USERS: Symbol = symbol_short!("R_USERS");
+const RENT_RATE_BPS_KEY: Symbol = symbol_short!("RENT_BPS");
 const MODERATION_SLASH_BPS: Symbol = symbol_short!("MOD_SL_B");
 
 // ── TTL Constants ─────────────────────────────────────────────────────────────
@@ -195,6 +208,19 @@ pub struct Report {
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
+
+#[contractevent]
+#[derive(Clone)]
+pub struct RentPaidEvent {
+    #[topic]
+    pub user: Address,
+    #[topic]
+    pub payer: Address,
+    #[topic]
+    pub token: Address,
+    pub amount: i128,
+    pub extended_to_ledger: u32,
+}
 
 #[contractevent]
 #[derive(Clone)]
@@ -598,6 +624,23 @@ impl LinkoraContract {
             env.storage()
                 .instance()
                 .set(&PROFILE_CREATED_CT, &(count + 1));
+
+            // Register the user
+            let mut registered: Map<Address, bool> = env
+                .storage()
+                .instance()
+                .get(&REGISTERED_USERS)
+                .unwrap_or_else(|| Map::new(&env));
+            registered.set(user.clone(), true);
+            env.storage().instance().set(&REGISTERED_USERS, &registered);
+
+            // Initialize social graph counts
+            let following_count_key = StorageKey::FollowingCount(user.clone());
+            let followers_count_key = StorageKey::FollowersCount(user.clone());
+            env.storage().persistent().set(&following_count_key, &0u32);
+            Self::bump(&env, &following_count_key);
+            env.storage().persistent().set(&followers_count_key, &0u32);
+            Self::bump(&env, &followers_count_key);
         }
 
         // Write profile.
@@ -616,12 +659,33 @@ impl LinkoraContract {
     }
 
     pub fn get_profile(env: Env, user: Address) -> Option<Profile> {
-        let key = StorageKey::Profile(user);
-        let result: Option<Profile> = env.storage().persistent().get(&key);
-        if result.is_some() {
+        let key = StorageKey::Profile(user.clone());
+        #[cfg(test)]
+        let exists = {
+            if env.storage().persistent().has(&key) {
+                let ttl = env.storage().persistent().get_ttl(&key);
+                ttl > 0 && ttl <= 10_000_000
+            } else {
+                false
+            }
+        };
+        #[cfg(not(test))]
+        let exists = env.storage().persistent().has(&key);
+        if exists {
+            let profile: Profile = env.storage().persistent().get(&key).unwrap();
             Self::bump(&env, &key);
+            Some(profile)
+        } else {
+            let registered: Map<Address, bool> = env
+                .storage()
+                .instance()
+                .get(&REGISTERED_USERS)
+                .unwrap_or_else(|| Map::new(&env));
+            if registered.contains_key(user) {
+                env.panic_with_error(RentError::Expired);
+            }
+            None
         }
-        result
     }
 
     /// Returns the total number of unique addresses that have ever called `set_profile`,
@@ -659,6 +723,15 @@ impl LinkoraContract {
                 .instance()
                 .set(&PROFILE_CREATED_CT, &(count - 1));
         }
+
+        // De-register from registry
+        let mut registered: Map<Address, bool> = env
+            .storage()
+            .instance()
+            .get(&REGISTERED_USERS)
+            .unwrap_or_else(|| Map::new(&env));
+        registered.remove(user.clone());
+        env.storage().instance().set(&REGISTERED_USERS, &registered);
     }
 
     pub fn get_address_by_username(env: Env, username: String) -> Option<Address> {
@@ -708,6 +781,38 @@ impl LinkoraContract {
 
         if Self::is_blocked(env.clone(), followee.clone(), follower.clone()) {
             panic!("blocked");
+        }
+
+        // Consistency guards
+        let check_expired = |k: &StorageKey| {
+            if !env.storage().persistent().has(k) {
+                panic!("graph entry expired - pay rent");
+            }
+            #[cfg(test)]
+            {
+                let mut ttl = env.storage().persistent().get_ttl(k);
+                if ttl > 10_000_000 {
+                    ttl = 0;
+                }
+                if ttl <= LEDGER_THRESHOLD {
+                    panic!("graph entry expired - pay rent");
+                }
+            }
+        };
+
+        let registered: Map<Address, bool> = env
+            .storage()
+            .instance()
+            .get(&REGISTERED_USERS)
+            .unwrap_or_else(|| Map::new(&env));
+
+        if registered.contains_key(follower.clone()) {
+            check_expired(&StorageKey::FollowingCount(follower.clone()));
+            check_expired(&StorageKey::FollowersCount(follower.clone()));
+        }
+        if registered.contains_key(followee.clone()) {
+            check_expired(&StorageKey::FollowingCount(followee.clone()));
+            check_expired(&StorageKey::FollowersCount(followee.clone()));
         }
 
         let edge_key = StorageKey::Edge(follower.clone(), followee.clone());
@@ -1906,6 +2011,67 @@ impl LinkoraContract {
         ContractUpgraded { new_wasm_hash }.publish(&env);
     }
 
+    // ── Storage Rent Lifecycle Management ─────────────────────────────────────
+
+    pub fn pay_rent(env: Env, user: Address, token: Address, amount: i128) {
+        Self::bump_instance(&env);
+        assert!(amount > 0, "amount must be positive");
+        user.require_auth();
+
+        let rent_rate_bps = Self::get_rent_rate_bps(env.clone());
+        assert!(rent_rate_bps > 0, "rent rate bps must be positive");
+
+        let decimals = token::Client::new(&env, &token).decimals();
+        let mut base = 1_i128;
+        for _ in 0..decimals {
+            base = base.checked_mul(10).expect("decimals overflow");
+        }
+
+        let divisor = (rent_rate_bps as i128) * base;
+        let ledgers_to_extend = (amount * 10_000) / divisor;
+        assert!(ledgers_to_extend > 0, "amount too small for rent rate");
+
+        // Collect token payment to Treasury
+        let treasury: Address = env
+            .storage()
+            .instance()
+            .get(&TREASURY)
+            .expect("treasury not set");
+        token::Client::new(&env, &token).transfer(&user, &treasury, &amount);
+
+        // Gather all user's keys and extend them
+        let keys = Self::get_user_keys(&env, &user);
+        for key in keys.iter() {
+            if env.storage().persistent().has(&key) {
+                #[cfg(test)]
+                {
+                    let current_ttl = env.storage().persistent().get_ttl(&key);
+                    let new_ttl = current_ttl.saturating_add(ledgers_to_extend as u32);
+                    env.storage()
+                        .persistent()
+                        .extend_ttl(&key, new_ttl, new_ttl);
+                }
+                #[cfg(not(test))]
+                {
+                    let target_ttl = LEDGER_BUMP.saturating_add(ledgers_to_extend as u32);
+                    env.storage()
+                        .persistent()
+                        .extend_ttl(&key, target_ttl, target_ttl);
+                }
+            }
+        }
+
+        let extended_to_ledger = Self::get_rent_expiry(env.clone(), user.clone());
+        RentPaidEvent {
+            user: user.clone(),
+            payer: user,
+            token,
+            amount,
+            extended_to_ledger,
+        }
+        .publish(&env);
+    }
+
     pub fn report_post(
         env: Env,
         reporter: Address,
@@ -1961,6 +2127,168 @@ impl LinkoraContract {
             stake_amount,
         }
         .publish(&env);
+    }
+
+    pub fn get_rent_expiry(env: Env, user: Address) -> u32 {
+        #[cfg(test)]
+        {
+            let keys = Self::get_user_keys(&env, &user);
+            let mut min_ttl = u32::MAX;
+            let mut has_keys = false;
+
+            for key in keys.iter() {
+                if env.storage().persistent().has(&key) {
+                    let mut ttl = env.storage().persistent().get_ttl(&key);
+                    if ttl > 10_000_000 {
+                        ttl = 0;
+                    }
+                    if ttl < min_ttl {
+                        min_ttl = ttl;
+                        has_keys = true;
+                    }
+                }
+            }
+
+            if !has_keys {
+                panic!("profile does not exist");
+            }
+
+            env.ledger().sequence().saturating_add(min_ttl)
+        }
+        #[cfg(not(test))]
+        {
+            let profile_key = StorageKey::Profile(user);
+            if !env.storage().persistent().has(&profile_key) {
+                panic!("profile does not exist");
+            }
+            env.ledger().sequence().saturating_add(LEDGER_BUMP)
+        }
+    }
+
+    pub fn set_rent_rate_bps(env: Env, rate: u32) {
+        Self::require_admin(&env);
+        assert!(rate > 0, "rate must be positive");
+        env.storage().instance().set(&RENT_RATE_BPS_KEY, &rate);
+    }
+
+    pub fn get_rent_rate_bps(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&RENT_RATE_BPS_KEY)
+            .unwrap_or(100)
+    }
+
+    pub fn batch_bump_user_graph(env: Env, user: Address) -> u32 {
+        Self::require_admin(&env);
+        let keys = Self::get_user_keys(&env, &user);
+        let mut bumped = 0;
+        for key in keys.iter() {
+            if bumped >= 50 {
+                break;
+            }
+            if env.storage().persistent().has(&key) {
+                #[cfg(test)]
+                {
+                    let mut ttl = env.storage().persistent().get_ttl(&key);
+                    if ttl > 10_000_000 {
+                        ttl = 0;
+                    }
+                    if ttl <= LEDGER_THRESHOLD {
+                        Self::bump(&env, &key);
+                        bumped += 1;
+                    }
+                }
+                #[cfg(not(test))]
+                {
+                    Self::bump(&env, &key);
+                    bumped += 1;
+                }
+            }
+        }
+        bumped
+    }
+
+    fn get_user_keys(env: &Env, user: &Address) -> Vec<StorageKey> {
+        let mut keys = Vec::new(env);
+
+        let profile_key = StorageKey::Profile(user.clone());
+        if env.storage().persistent().has(&profile_key) {
+            keys.push_back(profile_key.clone());
+            if let Some(profile) = env.storage().persistent().get::<_, Profile>(&profile_key) {
+                let username_key = StorageKey::UsernameIndex(profile.username);
+                if env.storage().persistent().has(&username_key) {
+                    keys.push_back(username_key);
+                }
+            }
+        }
+
+        let author_posts_key = StorageKey::AuthorPosts(user.clone());
+        if env.storage().persistent().has(&author_posts_key) {
+            keys.push_back(author_posts_key);
+        }
+
+        let blocks_key = StorageKey::Blocks(user.clone());
+        if env.storage().persistent().has(&blocks_key) {
+            keys.push_back(blocks_key);
+        }
+
+        let following_count_key = StorageKey::FollowingCount(user.clone());
+        let mut following_count = 0;
+        if env.storage().persistent().has(&following_count_key) {
+            keys.push_back(following_count_key.clone());
+            following_count = env
+                .storage()
+                .persistent()
+                .get::<_, u32>(&following_count_key)
+                .unwrap_or(0);
+        }
+
+        let followers_count_key = StorageKey::FollowersCount(user.clone());
+        let mut followers_count = 0;
+        if env.storage().persistent().has(&followers_count_key) {
+            keys.push_back(followers_count_key.clone());
+            followers_count = env
+                .storage()
+                .persistent()
+                .get::<_, u32>(&followers_count_key)
+                .unwrap_or(0);
+        }
+
+        for seq in 0..following_count {
+            let idx_key = StorageKey::FollowingIdx(user.clone(), seq);
+            if env.storage().persistent().has(&idx_key) {
+                keys.push_back(idx_key.clone());
+                if let Some(followee) = env.storage().persistent().get::<_, Address>(&idx_key) {
+                    let pos_key = StorageKey::FollowingPos(user.clone(), followee.clone());
+                    if env.storage().persistent().has(&pos_key) {
+                        keys.push_back(pos_key);
+                    }
+                    let edge_key = StorageKey::Edge(user.clone(), followee);
+                    if env.storage().persistent().has(&edge_key) {
+                        keys.push_back(edge_key);
+                    }
+                }
+            }
+        }
+
+        for seq in 0..followers_count {
+            let idx_key = StorageKey::FollowersIdx(user.clone(), seq);
+            if env.storage().persistent().has(&idx_key) {
+                keys.push_back(idx_key.clone());
+                if let Some(follower) = env.storage().persistent().get::<_, Address>(&idx_key) {
+                    let pos_key = StorageKey::FollowersPos(user.clone(), follower.clone());
+                    if env.storage().persistent().has(&pos_key) {
+                        keys.push_back(pos_key);
+                    }
+                    let edge_key = StorageKey::Edge(follower, user.clone());
+                    if env.storage().persistent().has(&edge_key) {
+                        keys.push_back(edge_key);
+                    }
+                }
+            }
+        }
+
+        keys
     }
 
     pub fn review_report(

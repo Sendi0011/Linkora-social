@@ -3,7 +3,7 @@
 use super::*;
 use soroban_sdk::{
     symbol_short,
-    testutils::{storage::Persistent as _, Address as _, Events, Ledger},
+    testutils::{Address as _, Events, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
     vec, Address, BytesN, Env, String,
 };
@@ -3345,6 +3345,116 @@ mod oracle_tests {
             &2000u64,
         );
     }
+}
+
+#[test]
+fn test_profile_expiry_detection() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    client.set_profile(&user, &String::from_str(&env, "alice"), &token);
+
+    // Profile should be retrievable initially
+    assert!(client.get_profile(&user).is_some());
+
+    // Simulate storage expiry: directly remove the Profile persistent key while
+    // keeping the REGISTERED_USERS registry in instance storage intact.
+    // This is exactly what the Soroban network does when a persistent entry's TTL
+    // reaches zero — the entry is archived and has() returns false.
+    let key = StorageKey::Profile(user.clone());
+    env.as_contract(&client.address, || {
+        env.storage().persistent().remove(&key);
+    });
+
+    // get_profile should now detect the user as registered-but-expired and
+    // panic with RentError::Expired (contract error code 1).
+    let res = client.try_get_profile(&user);
+    assert!(res.is_err());
+
+    if let Err(Ok(err)) = res {
+        let expected_err = soroban_sdk::Error::from_contract_error(1);
+        assert_eq!(err, expected_err);
+    } else {
+        panic!("expected contract error RentError::Expired");
+    }
+}
+
+#[test]
+fn test_pay_rent_extends_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token_address = setup_token(&env, &admin);
+
+    // Mint tokens to user directly
+    let token_client = StellarAssetClient::new(&env, &token_address);
+    token_client.mint(&user, &100_000_000_000);
+
+    client.set_profile(&user, &String::from_str(&env, "alice"), &token_address);
+
+    let initial_expiry = client.get_rent_expiry(&user);
+
+    client.set_rent_rate_bps(&100);
+
+    // Pay rent: 100,000,000 stroops
+    // decimals = 7, rent_rate_bps = 100, divisor = 1,000,000,000.
+    // ledgers_to_extend = (100_000_000 * 10_000) / 1,000,000,000 = 1,000.
+    let amount = 100_000_000;
+    client.pay_rent(&user, &token_address, &amount);
+
+    let post_expiry = client.get_rent_expiry(&user);
+    assert_eq!(post_expiry, initial_expiry + 1000);
+}
+
+#[test]
+#[should_panic(expected = "graph entry expired - pay rent")]
+fn test_follow_panics_on_expired_graph_keys() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let follower = Address::generate(&env);
+    let followee = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    client.set_profile(&follower, &String::from_str(&env, "alice"), &token);
+    client.set_profile(&followee, &String::from_str(&env, "bob"), &token);
+
+    // Advance ledger so keys expire
+    env.ledger().with_mut(|li| {
+        li.sequence_number += 535_001;
+    });
+
+    client.follow(&follower, &followee);
+}
+
+#[test]
+fn test_get_rent_expiry_minimum() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    client.set_profile(&user, &String::from_str(&env, "alice"), &token);
+
+    // Advance sequence by 435,000. Now all user keys have TTL of 100,000.
+    env.ledger().with_mut(|li| {
+        li.sequence_number += 435_000;
+    });
+
+    // Update profile. This bumps the Profile and UsernameIndex keys to 535,000,
+    // but leaves FollowingCount and FollowersCount keys at TTL 100,000.
+    client.set_profile(&user, &String::from_str(&env, "alice"), &token);
+
+    let expected_expiry = env.ledger().sequence() + 100_000;
+    assert_eq!(client.get_rent_expiry(&user), expected_expiry);
 }
 
 #[test]
