@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { ConnectWallet } from "./ConnectWallet";
+import { NavComposeButton } from "./NavComposeButton";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,6 +30,7 @@ export function Navbar() {
           <Link href="/pools" style={styles.navLink}>
             Pools
           </Link>
+          <NavComposeButton />
           <ConnectWallet />
         </div>
 
@@ -73,6 +75,7 @@ export function Navbar() {
           <Link href="/pools" style={styles.mobileNavLink} onClick={closeMenu}>
             Pools
           </Link>
+          <NavComposeButton />
           <div style={styles.mobileWalletWrapper}>
             <ConnectWallet />
           </div>
