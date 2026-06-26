@@ -1,6 +1,12 @@
 import { Pool } from "pg";
 
-export type NotificationEventType = "FOLLOW" | "TIP_RECEIVED" | "LIKE_RECEIVED";
+export type NotificationEventType =
+  | "FOLLOW"
+  | "TIP_RECEIVED"
+  | "LIKE_RECEIVED"
+  | "POST_REPORTED"
+  | "REPORT_DISMISSED"
+  | "POST_REMOVED_BY_MODERATION";
 
 export interface DeviceTokenRecord {
   address: string;
@@ -93,6 +99,12 @@ export class NotificationService {
         return "Tip received";
       case "LIKE_RECEIVED":
         return "Your post was liked";
+      case "POST_REPORTED":
+        return "Your post was reported";
+      case "REPORT_DISMISSED":
+        return "Report dismissed";
+      case "POST_REMOVED_BY_MODERATION":
+        return "Post removed by moderation";
       default:
         return "Linkora update";
     }
@@ -110,6 +122,12 @@ export class NotificationService {
         return `You received a tip${payload?.postId ? ` on post ${String(payload.postId)}` : ""}`;
       case "LIKE_RECEIVED":
         return `A user liked your post${payload?.postId ? ` ${String(payload.postId)}` : ""}`;
+      case "POST_REPORTED":
+        return `Your post was reported${payload?.reason ? ` for: ${String(payload.reason)}` : ""}`;
+      case "REPORT_DISMISSED":
+        return `Your report was dismissed${payload?.moderatorNotes ? `: ${String(payload.moderatorNotes)}` : ""}`;
+      case "POST_REMOVED_BY_MODERATION":
+        return `Your post was removed by moderation${payload?.reason ? `: ${String(payload.reason)}` : ""}`;
       default:
         return "You have a new notification";
     }

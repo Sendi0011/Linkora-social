@@ -1,12 +1,13 @@
 // Post detail screen — shows full content, like count, tip total, author info.
-import React, { useMemo } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { Alert, Pressable, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { useDeletePost } from "../../hooks/useDeletePost";
 import { getFeedPost } from "../../hooks/useFeed";
 import { useWallet } from "../../hooks/useWallet";
 import { useTheme } from "../../theme/useTheme";
+import { Post } from "../../components/PostCard";
 
 type PostParams = {
   id: string;
@@ -19,7 +20,25 @@ export default function PostDetailScreen() {
   const router = useRouter();
   const { address } = useWallet();
   const { deleting, deletePost } = useDeletePost();
-  const post = useMemo(() => (id ? getFeedPost(String(id)) : null), [id]);
+
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    getFeedPost(String(id))
+      .then((p) => {
+        setPost(p);
+      })
+      .catch((err) => {
+        console.error("Failed to load post details:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [id]);
+
   const isAuthor = Boolean(post && address === post.author);
 
   const handleDeletePress = () => {
@@ -41,6 +60,20 @@ export default function PostDetailScreen() {
       },
     ]);
   };
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.content,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.brand.primary} />
+      </View>
+    );
+  }
 
   if (!post) {
     return (

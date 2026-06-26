@@ -72,6 +72,21 @@ export function PostCard({
 
       <div style={styles.content}>{post.content}</div>
 
+      <div style={styles.stats}>
+        <span style={styles.statBadge} data-testid="like-count-badge">
+          <span style={styles.icon} aria-hidden="true">
+            ❤️
+          </span>
+          {likeCount} {likeCount === 1 ? "Like" : "Likes"}
+        </span>
+        <span style={styles.statBadge} data-testid="tip-total-badge">
+          <span style={styles.icon} aria-hidden="true">
+            💎
+          </span>
+          {formatTipTotal(post.tip_total)} XLM tipped
+        </span>
+      </div>
+
       <div style={styles.actions}>
         <button
           onClick={handleLike}
@@ -143,6 +158,24 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.6,
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
+  },
+  stats: {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing-sm)",
+    marginBottom: "var(--spacing-md)",
+    flexWrap: "wrap",
+  },
+  statBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "var(--spacing-xs)",
+    padding: "var(--spacing-xs) var(--spacing-sm)",
+    borderRadius: "999px",
+    background: "var(--color-primary-light)",
+    color: "var(--color-primary)",
+    fontSize: "0.8rem",
+    fontWeight: 600,
   },
   actions: {
     display: "flex",

@@ -64,7 +64,8 @@ export class LedgerSigner implements Signer {
     try {
       const transport = await this.getTransport();
       const { default: StrApp } = await import("@ledgerhq/hw-app-str");
-      const app = new StrApp(transport);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const app = new StrApp(transport as any);
 
       const result = await app.getPublicKey(derivationPath);
       this.publicKeyCache.set(derivationPath, result.publicKey);
@@ -91,7 +92,8 @@ export class LedgerSigner implements Signer {
     try {
       const transport = await this.getTransport();
       const { default: StrApp } = await import("@ledgerhq/hw-app-str");
-      const app = new StrApp(transport);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const app = new StrApp(transport as any);
 
       const xdrString = typeof tx === "string" ? tx : tx.toEnvelope().toXDR("base64");
       const txBytes = Buffer.from(xdrString, "base64");

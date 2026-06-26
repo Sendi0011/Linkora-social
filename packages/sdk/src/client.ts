@@ -330,6 +330,50 @@ export class LinkoraClient extends GeneratedLinkoraClient {
     return super.publishDmKey(user, x25519PubKey);
   }
 
+  /**
+   * Build a publish_dm_key transaction with the caller as the proper source
+   * account so it can be signed directly by a browser wallet (e.g. Freighter).
+   *
+   * Unlike publishDmKey(), which uses a random placeholder account, this method:
+   *  1. Fetches the real account sequence from Horizon.
+   *  2. Simulates the transaction to obtain accurate resource fees.
+   *  3. Returns a base64-encoded XDR ready for wallet signing and RPC submission.
+   */
+  async prepareDmKeyTx(
+    userAddress: string,
+    x25519PubKey: Uint8Array,
+    horizonUrl?: string,
+  ): Promise<string> {
+    if (x25519PubKey.length !== 32) {
+      throw new Error("X25519 public key must be exactly 32 bytes");
+    }
+
+    const horizon =
+      horizonUrl ??
+      (this._networkPassphrase.includes("Test")
+        ? "https://horizon-testnet.stellar.org"
+        : "https://horizon.stellar.org");
+
+    const res = await fetch(`${horizon}/accounts/${userAddress}`);
+    if (!res.ok) {
+      throw new Error(
+        `Could not fetch account from Horizon (HTTP ${res.status}). ` +
+          `Make sure the wallet is funded on the correct network.`,
+      );
+    }
+    const data = (await res.json()) as { sequence: string };
+
+    const sourceAccount = new Account(userAddress, data.sequence);
+    const tx = await this.prepareTransaction(
+      "publish_dm_key",
+      sourceAccount,
+      nativeToScVal(userAddress, { type: "address" }),
+      nativeToScVal(Array.from(x25519PubKey), { type: "bytes" }),
+    );
+
+    return tx.toEnvelope().toXDR("base64");
+  }
+
   // ── Governance convenience overrides ──────────────────────────────────────
 
   govPropose(

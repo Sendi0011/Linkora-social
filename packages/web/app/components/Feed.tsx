@@ -1,6 +1,7 @@
 "use client";
 
 import { PostCard, Post } from "./PostCard";
+import { PostCardSkeleton } from "./PostCardSkeleton";
 
 interface FeedProps {
   posts: Post[];
@@ -21,7 +22,7 @@ export function Feed({
     return (
       <div style={styles.container}>
         {[1, 2, 3].map((i) => (
-          <div key={i} style={styles.skeleton}></div>
+          <PostCardSkeleton key={i} />
         ))}
       </div>
     );
@@ -57,13 +58,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "600px",
     margin: "0 auto",
     padding: "var(--spacing-md)",
-  },
-  skeleton: {
-    height: "200px",
-    background: "var(--color-bg-secondary)",
-    borderRadius: "12px",
-    marginBottom: "var(--spacing-md)",
-    animation: "pulse 1.5s ease-in-out infinite",
   },
   empty: {
     textAlign: "center",

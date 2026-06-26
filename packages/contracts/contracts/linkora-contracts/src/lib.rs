@@ -2584,7 +2584,7 @@ impl LinkoraContract {
         data.push_back(((ledger >> 8) & 0xff) as u8);
         data.push_back((ledger & 0xff) as u8);
 
-        env.crypto().sha256(&data)
+        env.crypto().sha256(&data).into()
     }
 
     fn hash_merkle_pair(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
@@ -2599,7 +2599,7 @@ impl LinkoraContract {
         let mut data = Bytes::new(env);
         data.append(&left.to_bytes());
         data.append(&right.to_bytes());
-        env.crypto().sha256(&data)
+        env.crypto().sha256(&data).into()
     }
 
     fn bytesn_leq(left: &BytesN<32>, right: &BytesN<32>) -> bool {

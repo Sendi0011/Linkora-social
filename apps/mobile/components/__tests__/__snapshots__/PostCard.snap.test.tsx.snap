@@ -108,16 +108,24 @@ exports[`PostCard Snapshots renders default state correctly 1`] = `
         GABCD1...WXYZ
       </Text>
     </View>
-    <Text
+    <View
       style={
         {
-          "color": "#6B7280",
-          "fontSize": 11,
+          "alignItems": "flex-end",
         }
       }
     >
-      930d ago
-    </Text>
+      <Text
+        style={
+          {
+            "color": "#6B7280",
+            "fontSize": 11,
+          }
+        }
+      >
+        930d ago
+      </Text>
+    </View>
   </View>
   <Text
     style={
@@ -329,16 +337,24 @@ exports[`PostCard Snapshots renders with long content correctly 1`] = `
         GABCD1...WXYZ
       </Text>
     </View>
-    <Text
+    <View
       style={
         {
-          "color": "#6B7280",
-          "fontSize": 11,
+          "alignItems": "flex-end",
         }
       }
     >
-      930d ago
-    </Text>
+      <Text
+        style={
+          {
+            "color": "#6B7280",
+            "fontSize": 11,
+          }
+        }
+      >
+        930d ago
+      </Text>
+    </View>
   </View>
   <Text
     style={
@@ -550,16 +566,24 @@ exports[`PostCard Snapshots renders with zero likes correctly 1`] = `
         GABCD1...WXYZ
       </Text>
     </View>
-    <Text
+    <View
       style={
         {
-          "color": "#6B7280",
-          "fontSize": 11,
+          "alignItems": "flex-end",
         }
       }
     >
-      930d ago
-    </Text>
+      <Text
+        style={
+          {
+            "color": "#6B7280",
+            "fontSize": 11,
+          }
+        }
+      >
+        930d ago
+      </Text>
+    </View>
   </View>
   <Text
     style={

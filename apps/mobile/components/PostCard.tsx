@@ -24,6 +24,7 @@ export interface Post {
   timestamp: number;
   like_count: number;
   has_liked?: boolean;
+  sync_status?: "synced" | "pending" | "failed";
 }
 
 interface FeedPostCardProps {
@@ -114,7 +115,11 @@ export function PostCard(props: PostCardProps) {
           <Text style={styles.username}>{post.username}</Text>
           <Text style={styles.address}>{shortAddress(post.author)}</Text>
         </View>
-        <Text style={styles.time}>{timeLabel ?? formatTimestamp(post.timestamp)}</Text>
+        <View style={styles.timeContainer}>
+          <Text style={styles.time}>{timeLabel ?? formatTimestamp(post.timestamp)}</Text>
+          {post.sync_status === "pending" && <Text style={styles.pendingBadge}>⏳ Syncing</Text>}
+          {post.sync_status === "failed" && <Text style={styles.failedBadge}>⚠️ Failed</Text>}
+        </View>
       </View>
 
       <Text style={styles.content}>{post.content}</Text>
@@ -191,6 +196,20 @@ function createStyles(theme: ReturnType<typeof useTheme>["theme"]) {
     time: {
       color: theme.colors.text.secondary,
       fontSize: 11,
+    },
+    timeContainer: {
+      alignItems: "flex-end",
+    },
+    pendingBadge: {
+      fontSize: 9,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+    },
+    failedBadge: {
+      fontSize: 9,
+      color: theme.colors.semantic?.error ?? "#EF4444",
+      fontWeight: "700",
+      marginTop: 2,
     },
     content: {
       color: theme.colors.text.primary,

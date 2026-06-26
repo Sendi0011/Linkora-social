@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { LinkoraClient } from "linkora-sdk";
-import { OptimisticStore } from "@/lib/optimisticStore";
+import { OptimisticStore } from "@/lib/OptimisticStore";
+
 
 export interface FollowUser {
   address: string;
@@ -49,12 +50,16 @@ export function FollowList({ address, type }: FollowListProps) {
 
   useEffect(() => {
     client.current = new LinkoraClient({
-      contractId: process.env.NEXT_PUBLIC_CONTRACT_ID || "CBQHLSNMBF4HS3UX2PV72T75V2SXE7M2EZZTQ6YC5DSXIGGY4NPSAFAF",
+      contractId:
+        process.env.NEXT_PUBLIC_CONTRACT_ID ||
+        "CBQHLSNMBF4HS3UX2PV72T75V2SXE7M2EZZTQ6YC5DSXIGGY4NPSAFAF",
       rpcUrl: process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org",
     });
 
     if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("linkora_wallet_address") || localStorage.getItem("linkora_wallet_public_key");
+      const storedUser =
+        localStorage.getItem("linkora_wallet_address") ||
+        localStorage.getItem("linkora_wallet_public_key");
       setCurrentUser(storedUser);
 
       const storedBlocked = localStorage.getItem("linkora_blocked_accounts");
@@ -79,15 +84,17 @@ export function FollowList({ address, type }: FollowListProps) {
       setError(null);
 
       try {
-        const res = await fetch(`/api/follows/${address}/${type}?limit=${PAGE_SIZE}&offset=${offset}`);
+        const res = await fetch(
+          `/api/follows/${address}/${type}?limit=${PAGE_SIZE}&offset=${offset}`
+        );
         if (!res.ok) {
           throw new Error("Failed to load list");
         }
         const data = await res.json();
         const listField = type === "followers" ? data.followers : data.following;
-        
+
         setUsers((prev) => (replace ? listField : [...prev, ...listField]));
-        setHasMore(data.has_more ?? (listField.length >= PAGE_SIZE));
+        setHasMore(data.has_more ?? listField.length >= PAGE_SIZE);
         offsetRef.current = offset + listField.length;
       } catch (err) {
         setError("Failed to load users. Please try again later.");
@@ -135,7 +142,7 @@ export function FollowList({ address, type }: FollowListProps) {
     const isFollowing = OptimisticStore.isFollowing(targetAddress);
 
     OptimisticStore.setFollowing(targetAddress, !isFollowing);
-    OptimisticStore.setPending(targetAddress, true);
+    OptimisticStore.setPending(targetAddress, { isPending: true });
 
     try {
       const isMockAddress = targetAddress.includes("XXXX") || currentUser.includes("XXXX");
@@ -151,7 +158,7 @@ export function FollowList({ address, type }: FollowListProps) {
       OptimisticStore.setFollowing(targetAddress, isFollowing);
       alert(err instanceof Error ? err.message : "Action failed");
     } finally {
-      OptimisticStore.setPending(targetAddress, false);
+      OptimisticStore.setPending(targetAddress, { isPending: false });
     }
   };
 
@@ -168,7 +175,10 @@ export function FollowList({ address, type }: FollowListProps) {
   return (
     <div className="container mx-auto px-4 py-8 max-w-xl">
       <header className="flex flex-col gap-2 mb-6">
-        <Link href={`/profile/${address}`} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold mb-2 inline-block self-start">
+        <Link
+          href={`/profile/${address}`}
+          className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold mb-2 inline-block self-start"
+        >
           &larr; Back to Profile
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">
@@ -193,7 +203,11 @@ export function FollowList({ address, type }: FollowListProps) {
         </div>
       )}
 
-      <ul role="list" aria-label={type === "followers" ? "Followers list" : "Following list"} className="flex flex-col gap-3">
+      <ul
+        role="list"
+        aria-label={type === "followers" ? "Followers list" : "Following list"}
+        className="flex flex-col gap-3"
+      >
         {visibleUsers.map((user) => {
           const isFollowing = OptimisticStore.isFollowing(user.address);
           const isPending = OptimisticStore.isPending(user.address);
@@ -219,10 +233,15 @@ export function FollowList({ address, type }: FollowListProps) {
                   className="w-10 h-10 rounded-full border border-gray-200 flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <Link href={`/profile/${user.address}`} className="block font-semibold text-gray-900 hover:text-indigo-600 truncate">
+                  <Link
+                    href={`/profile/${user.address}`}
+                    className="block font-semibold text-gray-900 hover:text-indigo-600 truncate"
+                  >
                     @{user.username}
                   </Link>
-                  <span className="block text-xs text-gray-500 font-mono truncate">{formatAddress(user.address)}</span>
+                  <span className="block text-xs text-gray-500 font-mono truncate">
+                    {formatAddress(user.address)}
+                  </span>
                 </div>
 
                 {!isMe && currentUser && (
@@ -237,7 +256,9 @@ export function FollowList({ address, type }: FollowListProps) {
                         ? "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-250"
                         : "bg-indigo-600 text-white hover:bg-indigo-700"
                     } ${isPending ? "opacity-55 cursor-not-allowed" : "cursor-pointer"}`}
-                    aria-label={isFollowing ? `Unfollow ${user.username}` : `Follow ${user.username}`}
+                    aria-label={
+                      isFollowing ? `Unfollow ${user.username}` : `Follow ${user.username}`
+                    }
                   >
                     {isPending ? "Updating..." : isFollowing ? "Following" : "Follow"}
                   </button>
@@ -255,9 +276,7 @@ export function FollowList({ address, type }: FollowListProps) {
         </div>
       )}
 
-      {hasMore && !loading && (
-        <div id="infinite-scroll-trigger" className="h-1 my-2" />
-      )}
+      {hasMore && !loading && <div id="infinite-scroll-trigger" className="h-1 my-2" />}
     </div>
   );
 }

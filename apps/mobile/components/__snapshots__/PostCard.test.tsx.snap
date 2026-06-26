@@ -108,16 +108,24 @@ exports[`PostCard Accessibility avatar has minimum 44x44 touch target 1`] = `
         GABCD1...WXYZ
       </Text>
     </View>
-    <Text
+    <View
       style={
         {
-          "color": "#6B7280",
-          "fontSize": 11,
+          "alignItems": "flex-end",
         }
       }
     >
-      1h ago
-    </Text>
+      <Text
+        style={
+          {
+            "color": "#6B7280",
+            "fontSize": 11,
+          }
+        }
+      >
+        1h ago
+      </Text>
+    </View>
   </View>
   <Text
     style={

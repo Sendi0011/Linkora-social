@@ -20,6 +20,11 @@ import {
   handleGovProposalExecuted,
   handleGovProposalVetoed,
 } from "./handlers/governance";
+import {
+  handlePostReported,
+  handleReportDismissed,
+  handlePostRemovedByModeration,
+} from "./handlers/moderation";
 import { dispatchNotificationForBusEvent } from "./notifications/events";
 import { scValToNative, xdr } from "@stellar/stellar-sdk";
 
@@ -29,6 +34,9 @@ const TOPIC_TIP = "tip";
 const TOPIC_TIP_RECEIVED = "tip_received";
 const TOPIC_LIKE = "like";
 const TOPIC_LIKE_RECEIVED = "like_received";
+const TOPIC_POST_REPORTED = "post_reported";
+const TOPIC_REPORT_DISMISSED = "report_dismissed";
+const TOPIC_POST_REMOVED_BY_MODERATION = "post_removed_by_moderation";
 
 function toBusEvent(ev: IngestEvent): import("./bus").BusEvent {
   return {
@@ -241,6 +249,80 @@ export function createDomainProcessor(
           proposal_id: proposalId,
           ledger: event.ledgerSequence,
         });
+        break;
+      }
+
+      case TOPIC_POST_REPORTED: {
+        const postId = asBigInt(data.post_id);
+        const reporterAddress = asString(data.reporter_address ?? data.reporter);
+        const reason = asString(data.reason);
+
+        await handlePostReported(
+          client as never,
+          {
+            post_id: postId,
+            reporter_address: reporterAddress,
+            reason,
+          },
+          {
+            txHash: asString(data.txHash ?? data.tx_hash),
+            ledgerSeq: event.ledgerSequence,
+            timestamp: new Date(),
+          },
+          pool as never
+        );
+
+        await dispatchNotificationForBusEvent(pool as never, notificationService, busEvent);
+        break;
+      }
+
+      case TOPIC_REPORT_DISMISSED: {
+        const postId = asBigInt(data.post_id);
+        const reporterAddress = asString(data.reporter_address ?? data.reporter);
+        const moderatorAddress = asString(data.moderator_address ?? data.moderator);
+        const moderatorNotes = asString(data.moderator_notes);
+
+        await handleReportDismissed(
+          client as never,
+          {
+            post_id: postId,
+            reporter_address: reporterAddress,
+            moderator_address: moderatorAddress,
+            moderator_notes: moderatorNotes || undefined,
+          },
+          {
+            txHash: asString(data.txHash ?? data.tx_hash),
+            ledgerSeq: event.ledgerSequence,
+            timestamp: new Date(),
+          },
+          pool as never
+        );
+
+        await dispatchNotificationForBusEvent(pool as never, notificationService, busEvent);
+        break;
+      }
+
+      case TOPIC_POST_REMOVED_BY_MODERATION: {
+        const postId = asBigInt(data.post_id);
+        const moderatorAddress = asString(data.moderator_address ?? data.moderator);
+        const reason = asString(data.reason);
+
+        await handlePostRemovedByModeration(
+          client as never,
+          {
+            post_id: postId,
+            moderator_address: moderatorAddress,
+            reason,
+          },
+          {
+            txHash: asString(data.txHash ?? data.tx_hash),
+            ledgerSeq: event.ledgerSequence,
+            timestamp: new Date(),
+          },
+          pool as never
+        );
+
+        await dispatchNotificationForBusEvent(pool as never, notificationService, busEvent);
         break;
       }
 

@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/hooks/useWallet";
 import SearchBar from "@/components/SearchBar";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
+import { PostComposeModal } from "./PostComposeModal";
 
 /** Truncates a Stellar address to G…XXXX format */
 function truncateAddress(address: string): string {
@@ -15,6 +17,7 @@ export function NavBar() {
   const router = useRouter();
   const { address, connected, network, connect, disconnect } = useWallet();
   const { unreadCount } = useNotificationsContext();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
@@ -70,6 +73,15 @@ export function NavBar() {
           )}
           {connected && address ? (
             <>
+              {/* Compose button */}
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+                aria-label="Compose new post"
+              >
+                Compose
+              </button>
+
               {/* Network badge */}
               {network && (
                 <span className="hidden sm:inline-flex items-center rounded-full bg-violet-900/40 px-2.5 py-0.5 text-xs font-medium text-violet-300 border border-violet-700/50">
@@ -106,6 +118,13 @@ export function NavBar() {
           )}
         </div>
       </nav>
+
+      {/* Compose Modal */}
+      <PostComposeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        publicKey={address}
+      />
     </header>
   );
 }

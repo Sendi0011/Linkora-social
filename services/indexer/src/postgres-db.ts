@@ -172,6 +172,7 @@ export class PostgresDatabase implements Database {
       SELECT
         id,
         author,
+        content,
         deleted_at IS NOT NULL AS deleted,
         tip_total,
         like_count,
@@ -189,6 +190,7 @@ export class PostgresDatabase implements Database {
     return {
       id: BigInt(row.id),
       author: row.author,
+      content: row.content,
       deleted: row.deleted,
       tip_total: BigInt(row.tip_total),
       like_count: BigInt(row.like_count),
@@ -219,6 +221,7 @@ export class PostgresDatabase implements Database {
       SELECT
         id,
         author,
+        content,
         deleted_at IS NOT NULL AS deleted,
         tip_total,
         like_count,
@@ -235,6 +238,7 @@ export class PostgresDatabase implements Database {
     const posts: Post[] = res.rows.map((row) => ({
       id: BigInt(row.id),
       author: row.author,
+      content: row.content,
       deleted: row.deleted,
       tip_total: BigInt(row.tip_total),
       like_count: BigInt(row.like_count),
@@ -243,6 +247,97 @@ export class PostgresDatabase implements Database {
     }));
 
     return { posts, total };
+  }
+
+  async listPostsCursor(filters: {
+    author?: string;
+    limit: number;
+    cursor?: number;
+  }): Promise<{ posts: Post[]; total: number; hasMore: boolean }> {
+    const { author, limit, cursor } = filters;
+
+    const totalRes = await this.pool.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM posts
+      WHERE ($1::text IS NULL OR author = $1)
+      `,
+      [author ?? null]
+    );
+    const total = totalRes.rows[0]?.total ?? 0;
+
+    if (cursor !== undefined) {
+      const res = await this.pool.query(
+        `
+        SELECT
+          id,
+          author,
+          content,
+          deleted_at IS NOT NULL AS deleted,
+          tip_total,
+          like_count,
+          extract(epoch from created_at)::bigint AS created_ledger,
+          CASE WHEN deleted_at IS NULL THEN NULL ELSE extract(epoch from deleted_at)::bigint END AS deleted_ledger
+        FROM posts
+        WHERE ($1::text IS NULL OR author = $1)
+          AND created_at < to_timestamp($2)
+        ORDER BY created_at DESC
+        LIMIT $3
+        `,
+        [author ?? null, cursor, limit + 1]
+      );
+
+      const hasMore = res.rows.length > limit;
+      const rows = hasMore ? res.rows.slice(0, limit) : res.rows;
+
+      const posts: Post[] = rows.map((row) => ({
+        id: BigInt(row.id),
+        author: row.author,
+        content: row.content,
+        deleted: row.deleted,
+        tip_total: BigInt(row.tip_total),
+        like_count: BigInt(row.like_count),
+        created_ledger: Number(row.created_ledger),
+        deleted_ledger: row.deleted_ledger === null ? null : Number(row.deleted_ledger),
+      }));
+
+      return { posts, total, hasMore };
+    }
+
+    const res = await this.pool.query(
+      `
+      SELECT
+        id,
+        author,
+        content,
+        deleted_at IS NOT NULL AS deleted,
+        tip_total,
+        like_count,
+        extract(epoch from created_at)::bigint AS created_ledger,
+        CASE WHEN deleted_at IS NULL THEN NULL ELSE extract(epoch from deleted_at)::bigint END AS deleted_ledger
+      FROM posts
+      WHERE ($1::text IS NULL OR author = $1)
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      [author ?? null, limit + 1]
+    );
+
+    const hasMore = res.rows.length > limit;
+    const rows = hasMore ? res.rows.slice(0, limit) : res.rows;
+
+    const posts: Post[] = rows.map((row) => ({
+      id: BigInt(row.id),
+      author: row.author,
+      content: row.content,
+      deleted: row.deleted,
+      tip_total: BigInt(row.tip_total),
+      like_count: BigInt(row.like_count),
+      created_ledger: Number(row.created_ledger),
+      deleted_ledger: row.deleted_ledger === null ? null : Number(row.deleted_ledger),
+    }));
+
+    return { posts, total, hasMore };
   }
 
   // ───────────────────────────────── Likes ────────────────────────────────────
@@ -423,6 +518,24 @@ export class PostgresDatabase implements Database {
     );
   }
 
+  // ───────────────────────────────── Reports ───────────────────────────────────
+
+  async insertReport(report: import("./db").Report): Promise<void> {
+    await this.pool.query(
+      `
+      INSERT INTO reports (post_id, reporter_address, reason, status)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (post_id, reporter_address) WHERE status = 'pending' DO NOTHING
+      `,
+      [
+        report.post_id.toString(),
+        report.reporter_address,
+        report.reason,
+        report.status || "pending",
+      ]
+    );
+  }
+
   async updateGovernanceProposalStatus(
     proposal_id: bigint,
     status: string,
@@ -507,5 +620,62 @@ export class PostgresDatabase implements Database {
     }));
 
     return { proposals, total };
+  }
+
+  async updateReportStatus(
+    post_id: bigint,
+    reporter_address: string,
+    status: "dismissed" | "action_taken",
+    moderator_address?: string,
+    moderator_notes?: string
+  ): Promise<void> {
+    const query = `
+      UPDATE reports
+      SET status = $1,
+          moderator_address = $2,
+          moderator_notes = $3
+      WHERE post_id = $4 AND reporter_address = $5 AND status = 'pending'
+    `;
+
+    await this.pool.query(query, [
+      status,
+      moderator_address || null,
+      moderator_notes || null,
+      post_id.toString(),
+      reporter_address,
+    ]);
+  }
+
+  async getPostReports(post_id: bigint): Promise<import("./db").Report[]> {
+    const res = await this.pool.query(
+      `
+      SELECT
+        id,
+        post_id,
+        reporter_address,
+        reason,
+        status,
+        moderator_address,
+        moderator_notes,
+        created_at,
+        updated_at
+      FROM reports
+      WHERE post_id = $1
+      ORDER BY created_at DESC
+      `,
+      [post_id.toString()]
+    );
+
+    return res.rows.map((row) => ({
+      id: row.id,
+      post_id: BigInt(row.post_id),
+      reporter_address: row.reporter_address,
+      reason: row.reason,
+      status: row.status,
+      moderator_address: row.moderator_address,
+      moderator_notes: row.moderator_notes,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
   }
 }

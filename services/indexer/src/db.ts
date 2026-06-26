@@ -27,6 +27,7 @@ export interface Post {
   like_count: bigint;
   created_ledger: number;
   deleted_ledger: number | null;
+  content: string;
 }
 
 export interface Like {
@@ -43,6 +44,18 @@ export interface Tip {
   fee: bigint;
   ledger: number;
   tx_hash: string;
+}
+
+export interface Report {
+  id?: number;
+  post_id: bigint;
+  reporter_address: string;
+  reason: string;
+  status: "pending" | "dismissed" | "action_taken";
+  moderator_address?: string;
+  moderator_notes?: string;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 export interface Pool {
@@ -95,6 +108,17 @@ export interface Database {
   // Tips
   insertTip(tip: Tip): Promise<void>;
 
+  // Reports
+  insertReport(report: Report): Promise<void>;
+  updateReportStatus(
+    post_id: bigint,
+    reporter_address: string,
+    status: "dismissed" | "action_taken",
+    moderator_address?: string,
+    moderator_notes?: string
+  ): Promise<void>;
+  getPostReports(post_id: bigint): Promise<Report[]>;
+
   // Pools
   upsertPool(pool: Pool): Promise<void>;
   adjustPoolBalance(pool_id: string, delta: bigint, ledger: number): Promise<void>;
@@ -125,6 +149,11 @@ export interface Database {
     limit: number;
     offset: number;
   }): Promise<{ posts: Post[]; total: number }>;
+  listPostsCursor(filters: {
+    author?: string;
+    limit: number;
+    cursor?: number;
+  }): Promise<{ posts: Post[]; total: number; hasMore: boolean }>;
   getFollowers(
     address: string,
     limit: number,
