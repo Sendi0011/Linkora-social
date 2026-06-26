@@ -2806,35 +2806,69 @@ fn test_gov_happy_path_propose_vote_execute() {
 }
 
 #[test]
-fn test_gov_quorum_decay_proposal_fails_below_floor() {
+fn test_gov_quorum_decay_effective_quorum_decreases_over_time() {
+    // Verify that effective_quorum decreases as ledgers elapse.
     let env = Env::default();
     env.mock_all_auths();
+    // quorum=60, time_lock=50, vote_window=100, decay_rate=500 bps (5%/ledger), floor=10
+    let (client, _admin, _) = setup_contract(&env);
+    client.gov_init_config(&60, &50, &100, &500, &10);
+
+    let proposer = Address::generate(&env);
+    let proposal_id = client.gov_propose(&proposer, &GovParameter::FeeBps, &100, &None);
+
+    // At creation time quorum equals the configured value.
+    let q0 = client.effective_quorum(&proposal_id);
+    assert_eq!(q0, 60, "quorum at creation must equal configured value");
+
+    // Advance 100 ledgers: decay = 100 * 500 / 10000 = 5 → effective = max(10, 60-5) = 55
+    env.ledger().with_mut(|li| {
+        li.sequence_number += 100;
+    });
+    let q100 = client.effective_quorum(&proposal_id);
+    assert_eq!(q100, 55, "quorum should decay to 55 after 100 ledgers");
+    assert!(q100 < q0, "quorum must decrease with elapsed ledgers");
+
+    // Advance another 900 ledgers (total 1000): decay = 1000*500/10000 = 50 → max(10, 60-50)=10
+    env.ledger().with_mut(|li| {
+        li.sequence_number += 900;
+    });
+    let q1000 = client.effective_quorum(&proposal_id);
+    assert_eq!(q1000, 10, "quorum should decay to floor (10) after 1000 ledgers");
+    assert!(q1000 < q100, "quorum must continue decreasing");
+}
+
+#[test]
+#[should_panic(expected = "quorum not met")]
+fn test_gov_quorum_decay_proposal_fails_below_floor() {
+    // Even with maximum quorum decay (floor=30), a proposal with 20% approval fails.
+    let env = Env::default();
+    env.mock_all_auths();
+    // setup_governance uses: quorum=60, time_lock=100, vote_window=200, decay=50, floor=30
     let (client, _admin, _) = setup_governance(&env);
 
     let proposer = Address::generate(&env);
     let proposal_id = client.gov_propose(&proposer, &GovParameter::FeeBps, &100, &None);
 
-    // 2 for, 3 against = 40% approval
+    // 1 for, 4 against = 20% approval — below the 30% floor
     let v1 = Address::generate(&env);
     let v2 = Address::generate(&env);
     let v3 = Address::generate(&env);
     let v4 = Address::generate(&env);
     let v5 = Address::generate(&env);
     client.gov_vote(&v1, &proposal_id, &true);
-    client.gov_vote(&v2, &proposal_id, &true);
+    client.gov_vote(&v2, &proposal_id, &false);
     client.gov_vote(&v3, &proposal_id, &false);
     client.gov_vote(&v4, &proposal_id, &false);
     client.gov_vote(&v5, &proposal_id, &false);
 
+    // Advance far enough for maximum decay — floor stays at 30
     env.ledger().with_mut(|li| {
-        li.sequence_number += 200 + 100;
+        li.sequence_number += 10_000; // well past vote_window + time_lock
     });
 
-    // effective_quorum: floor is 30, even with max decay it stays at 30
-    // approval_pct = 2/5 * 100 = 40 >= 30 → passes even with floor
-    // Actually 40 >= 30 so this will pass. Let's test actual failure instead.
-    // For failure: 1 for, 4 against = 20% < 30% floor
-    // Recreate scenario for actual failure
+    // effective_quorum decays to floor=30; 20% < 30% → must panic "quorum not met"
+    client.gov_execute(&proposal_id);
 }
 
 #[test]

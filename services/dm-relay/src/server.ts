@@ -5,14 +5,16 @@
  * are end-to-end encrypted using X25519 + ChaCha20-Poly1305.
  */
 
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Database } from './database';
 import { AuthService } from './auth';
 import { CleanupService } from './cleanup';
-import { createRouter } from './routes';
+import { createRouter, registerWsClient } from './routes';
 import {
   requestIdMiddleware,
   requestLoggerMiddleware,
@@ -88,13 +90,30 @@ async function createApp() {
   app.use(notFoundHandler);
   app.use(errorHandler);
 
+  // WebSocket server for real-time push to online recipients
+  // Clients connect with ?address=<STELLAR_ADDRESS> to receive their messages.
+  const httpServer = http.createServer(app);
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+
+  wss.on('connection', (ws: WebSocket, req) => {
+    const url = new URL(req.url ?? '/', `http://localhost`);
+    const address = url.searchParams.get('address') ?? '';
+    if (address) {
+      registerWsClient(address, ws);
+      console.log(`[ws] Client connected for ${address}`);
+    } else {
+      ws.close(1008, 'Missing address query param');
+    }
+  });
+
   // Graceful shutdown
   const gracefulShutdown = async (signal: string) => {
     console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
-    
+
+    wss.close();
     cleanupService.stop();
     await database.close();
-    
+
     console.log('Graceful shutdown completed.');
     process.exit(0);
   };
@@ -102,14 +121,14 @@ async function createApp() {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-  return { app, database, cleanupService };
+  return { app: httpServer, database, cleanupService };
 }
 
 async function startServer() {
   try {
-    const { app } = await createApp();
+    const { app: httpServer } = await createApp();
 
-    const server = app.listen(config.port, () => {
+    const server = httpServer.listen(config.port, () => {
       console.log(`
 ╭─────────────────────────────────────────────────╮
 │  🔐 Linkora DM Relay Service                    │

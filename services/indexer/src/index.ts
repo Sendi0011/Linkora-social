@@ -22,7 +22,7 @@
 
 import http from "http";
 import { Pool } from "pg";
-import { streamEvents, RawEvent, BatchProcessor } from "./stream";
+import { streamEvents, backfillStartupGap, getBackfillState, RawEvent, BatchProcessor } from "./stream";
 import { IngestPipeline, IngestEvent } from "./pipeline";
 import { bus } from "./bus";
 import { attachWebSocketServer } from "./ws";
@@ -194,6 +194,37 @@ async function main(): Promise<void> {
 
   // Resume gap detection from the last committed cursor.
   const initialCursor = await pipeline.readCursor();
+
+  // ── Startup gap detection ─────────────────────────────────────────────────
+  // If the indexer was down, fetch the current ledger from RPC and backfill
+  // any ledgers between processed_cursor and current before streaming live.
+  if (initialCursor > 0) {
+    try {
+      const rpcRes = await fetch(STELLAR_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getLatestLedger", params: {} }),
+      });
+      if (rpcRes.ok) {
+        const rpcJson = (await rpcRes.json()) as { result?: { sequence: number } };
+        const currentLedger = rpcJson.result?.sequence ?? 0;
+        if (currentLedger > initialCursor + 1) {
+          console.log(
+            `[indexer] Startup gap detected: processed=${initialCursor}, current=${currentLedger}. Backfilling…`
+          );
+          await backfillStartupGap(
+            { rpcUrl: STELLAR_RPC_URL, contractId: CONTRACT_ID },
+            initialCursor + 1,
+            currentLedger,
+            processBatch,
+            abortController.signal
+          );
+        }
+      }
+    } catch (err) {
+      console.warn("[indexer] Startup gap check failed (continuing):", err);
+    }
+  }
 
   httpServer.listen(PORT, () => {
     console.log(`[indexer] HTTP + WS listening on :${PORT} (ws path /ws)`);
