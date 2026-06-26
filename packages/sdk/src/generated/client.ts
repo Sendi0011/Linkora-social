@@ -486,5 +486,96 @@ export class GeneratedLinkoraClient {
 
   setTipCooldownWindow(cooldown_ledgers: number): string {
     return this.buildTx("set_tip_cooldown_window", scvU32(cooldown_ledgers));
+    // ── Additional Write Methods ───────────────────────────────────────
+  payRent(renter: string, amount: bigint): string {
+    return this.buildTx(
+      "pay_rent",
+      scvAddress(renter),
+      scvI128(amount)
+    );
   }
+
+  reportPost(reporter: string, post_id: bigint, reason: string): string {
+    return this.buildTx(
+      "report_post",
+      scvAddress(reporter),
+      scvU64(post_id),
+      scvString(reason)
+    );
+  }
+
+  reviewReport(admin: string, report_id: bigint, decision: boolean): string {
+    return this.buildTx(
+      "review_report",
+      scvAddress(admin),
+      scvU64(report_id),
+      nativeToScVal(decision)
+    );
+  }
+
+  registerOracle(admin: string, oracle: string): string {
+    return this.buildTx(
+      "register_oracle",
+      scvAddress(admin),
+      scvAddress(oracle)
+    );
+  }
+
+  verifyAnalyticsAttestation(admin: string, attestation: Uint8Array): string {
+    return this.buildTx(
+      "verify_analytics_attestation",
+      scvAddress(admin),
+      nativeToScVal(attestation, { type: "bytes" })
+    );
+  }
+
+  setRentRateBps(admin: string, bps: number): string {
+    return this.buildTx(
+      "set_rent_rate_bps",
+      scvAddress(admin),
+      scvU32(bps)
+    );
+  }
+
+  batchBumpUserGraph(admin: string, users: string[]): string {
+    return this.buildTx(
+      "batch_bump_user_graph",
+      scvAddress(admin),
+      scvAddressVec(users)
+    );
+  }
+
+  // ── Additional Read Methods ────────────────────────────────────────
+  async getRentExpiry(user: string): Promise<number> {
+    const retval = await this.simulateCall("get_rent_expiry", scvAddress(user));
+    if (!retval) return 0;
+    return scValToNative(retval) as number;
+  }
+
+  async getRentRateBps(): Promise<number> {
+    const retval = await this.simulateCall("get_rent_rate_bps");
+    if (!retval) return 0;
+    return scValToNative(retval) as number;
+  }
+
+  async getReportCount(): Promise<bigint> {
+    const retval = await this.simulateCall("get_report_count");
+    if (!retval) return 0n;
+    return scValToNative(retval) as bigint;
+  }
+
+  async getReport(report_id: bigint): Promise<any | null> {
+    const retval = await this.simulateCall("get_report", scvU64(report_id));
+    if (!retval) return null;
+    try {
+      const raw = scValToNative(retval);
+      return raw == null ? null : raw;
+    } catch (e) {
+      if (e instanceof NotFoundError) return null;
+      throw e;
+    }
+  }
+
+}
+
 }
