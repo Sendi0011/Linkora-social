@@ -32,3 +32,5 @@ test.describe('Wallet Connection & Profile Registration', () => {
     await expect(page.locator('[data-testid="connect-wallet"]').first()).toBeVisible({ timeout: 10000 });
   });
 });
+
+
