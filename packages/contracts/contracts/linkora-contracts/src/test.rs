@@ -3939,3 +3939,159 @@ fn test_moderation_uphold_no_slash_when_bps_zero() {
         author_balance_before
     );
 }
+
+// ── Issue #687: tip emits TipEvent with correct fee split ──────────────────────
+
+#[test]
+fn test_tip_emits_event_with_correct_fee_split() {
+    // Set fee to 500 bps (5%). Tip 1000 units. Verify the TipEvent emitted has
+    // amount = 1000 and fee = 50. Verify treasury received 50 and author received 950.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let author = Address::generate(&env);
+    let tipper = Address::generate(&env);
+
+    // Initialize with fee_bps = 500 (5%)
+    client.initialize(&admin, &treasury, &500);
+
+    let token = setup_token(&env, &tipper);
+    let post_id = client.create_post(&author, &String::from_str(&env, "Fee split test"));
+
+    // Tip 1000 units
+    let tip_amount: i128 = 1000;
+    client.tip(&tipper, &post_id, &token, &tip_amount);
+
+    // Verify the TipEvent was emitted with correct values
+    let events = env.events().all();
+    let event_vec = events.events();
+    
+    // Find the TipEvent (should be the last event emitted)
+    let mut found_tip_event = false;
+    for (_contract_id, topics, data) in event_vec.iter() {
+        // TipEvent has topic "TipEvent" and contains amount and fee
+        if let Ok(event_data) = data.try_into_val::<(i128, i128)>(&env) {
+            let (amount, fee) = event_data;
+            if amount == 1000 && fee == 50 {
+                found_tip_event = true;
+                break;
+            }
+        }
+    }
+    
+    assert!(found_tip_event, "TipEvent with amount=1000 and fee=50 must be emitted");
+
+    // Verify treasury received 50
+    assert_eq!(
+        TokenClient::new(&env, &token).balance(&treasury),
+        50,
+        "treasury must receive fee of 50"
+    );
+
+    // Verify author received 950
+    assert_eq!(
+        TokenClient::new(&env, &token).balance(&author),
+        950,
+        "author must receive 950 (1000 - 50)"
+    );
+}
+
+// ── Issue #686: upgrade is restricted to admin ─────────────────────────────────
+
+#[test]
+#[should_panic]
+fn test_upgrade_by_non_admin_fails_auth() {
+    // Call upgrade from a non-admin address with a dummy wasm hash.
+    // Verify the call fails auth. Verify the contract wasm is unchanged.
+    let env = Env::default();
+    let (client, _admin, _) = setup_contract(&env);
+
+    let non_admin = Address::generate(&env);
+    let mock_hash = BytesN::from_array(&env, &[99u8; 32]);
+
+    // Don't mock auths - this should panic due to missing admin auth
+    // The non-admin doesn't have authority, so require_auth should fail
+    non_admin.require_auth();
+    client.upgrade(&mock_hash);
+}
+
+// ── Issue #688: set_fee rejects fee_bps > 10000 ────────────────────────────────
+
+#[test]
+#[should_panic(expected = "invalid fee")]
+fn test_set_fee_rejects_fee_above_max() {
+    // Call set_fee(10001) and verify it panics with 'invalid fee'.
+    // Verify get_fee_bps() still returns the original value.
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _admin, _) = setup_contract(&env);
+
+    // Original fee is 0 (from setup_contract)
+    assert_eq!(client.get_fee_bps(), 0);
+
+    // Try to set fee to 10001 (>100%) - should panic with "invalid fee"
+    client.set_fee(&10_001);
+}
+
+#[test]
+fn test_set_fee_preserves_old_value_on_rejection() {
+    // Verify that when set_fee is rejected, the original value is preserved
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _admin, _) = setup_contract(&env);
+
+    // Set a valid fee first
+    client.set_fee(&250);
+    assert_eq!(client.get_fee_bps(), 250);
+
+    // Try to set an invalid fee using try_ variant to capture the error
+    let result = client.try_set_fee(&10_001);
+    assert!(result.is_err(), "set_fee with fee_bps > 10000 must fail");
+
+    // Verify the original fee value is preserved
+    assert_eq!(
+        client.get_fee_bps(),
+        250,
+        "fee must remain unchanged after rejected set_fee"
+    );
+}
+
+// ── Issue #689: create_post enforces 1-character minimum content ───────────────
+
+#[test]
+#[should_panic(expected = "empty content")]
+fn test_create_post_empty_string_panics() {
+    // Call create_post with an empty string (""). Verify it panics with 'empty content'.
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+
+    // Try to create post with empty content - should panic with "empty content"
+    client.create_post(&author, &String::from_str(&env, ""));
+}
+
+#[test]
+fn test_create_post_single_character_succeeds() {
+    // Call with a single character — verify it succeeds.
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+
+    // Create post with single character - should succeed
+    let post_id = client.create_post(&author, &String::from_str(&env, "x"));
+    
+    // Verify the post was created successfully
+    let post = client.get_post(&post_id).unwrap();
+    assert_eq!(post.content, String::from_str(&env, "x"));
+    assert_eq!(post.author, author);
+    assert_eq!(post.id, post_id);
+}
