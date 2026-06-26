@@ -39,5 +39,19 @@ export function createNotificationsRouter(service: NotificationService): Router 
     res.status(204).send();
   });
 
+  router.post("/deregister", async (req: Request, res: Response): Promise<void> => {
+    const { address } = req.body as { address?: unknown };
+
+    if (typeof address !== "string" || !ADDRESS_PATTERN.test(address)) {
+      res
+        .status(400)
+        .json({ error: "address must be a Stellar public key", code: "INVALID_ADDRESS" });
+      return;
+    }
+
+    await service.deregisterDeviceToken(address);
+    res.status(204).send();
+  });
+
   return router;
 }

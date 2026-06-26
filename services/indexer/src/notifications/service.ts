@@ -18,6 +18,7 @@ export interface DeviceTokenRecord {
 export interface DeviceTokenStore {
   register(address: string, token: string, platform: string): Promise<void>;
   getToken(address: string): Promise<string | null>;
+  removeToken(address: string): Promise<void>;
 }
 
 export interface NotificationDispatchOptions {
@@ -52,6 +53,14 @@ export class NotificationService {
 
   async getDeviceToken(address: string): Promise<string | null> {
     return this.deviceTokenStore.getToken(address);
+  }
+
+  async deregisterDeviceToken(address: string): Promise<void> {
+    if (!address) {
+      return;
+    }
+
+    await this.deviceTokenStore.removeToken(address);
   }
 
   async dispatchEventNotification(options: NotificationDispatchOptions): Promise<boolean> {
@@ -153,6 +162,10 @@ export class MemoryDeviceTokenStore implements DeviceTokenStore {
   async getToken(address: string): Promise<string | null> {
     return this.deviceTokens.get(address)?.token ?? null;
   }
+
+  async removeToken(address: string): Promise<void> {
+    this.deviceTokens.delete(address);
+  }
 }
 
 export class PostgresDeviceTokenStore implements DeviceTokenStore {
@@ -184,6 +197,16 @@ export class PostgresDeviceTokenStore implements DeviceTokenStore {
     );
 
     return (res.rows[0]?.token as string | undefined) ?? null;
+  }
+
+  async removeToken(address: string): Promise<void> {
+    await this.pool.query(
+      `
+      DELETE FROM device_tokens
+      WHERE address = $1
+      `,
+      [address]
+    );
   }
 }
 
